@@ -15,6 +15,11 @@ css='''
 .ctab span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ctab small{color:var(--muted);font-weight:700;font-size:11px;background:var(--hover);border-radius:999px;padding:0 6px}
 .ctab svg{flex:none;color:var(--muted)}
+.cgrp{display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:4px 6px 4px 4px;border:1px dashed color-mix(in srgb,var(--accent) 45%,var(--line));border-radius:12px;width:100%}
+.glab{display:inline-flex;gap:5px;align-items:center;font-size:12px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:.04em;padding:0 6px}
+.ctab .no{display:inline-grid;place-items:center;min-width:20px;height:20px;border-radius:999px;background:#475569;color:#fff;font-size:11px;font-weight:800;padding:0 5px}
+.ctab.on .no{background:var(--accent)}
+#pr_view .seg button{padding:5px 10px;font-size:12.5px}
 .ctab:hover{border-color:var(--accent)}
 .ctab.on{background:color-mix(in srgb,var(--accent) 14%,var(--bg2));border-color:var(--accent)}
 .ctab.on svg{color:var(--accent)}

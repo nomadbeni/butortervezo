@@ -9,7 +9,7 @@ Kezdőlap: `index.html` (az appok listája, minden app fejlécében a ház ikon 
 | Fájl | App |
 |---|---|
 | `kanape.html` | Kanapé-tervező: felülnézet téglalap elemekből (ülőrész, bőr perem / könyöklő, háttámla, párna), automatikus méretláncok, oldalnézet, méret-táblázat, jelmagyarázat; tervlap export PNG, SVG és PDF (A4 fekvő) |
-| `polcrendezo.html` | Polcrendező: fali, álló, konyha- és fürdőszoba szekrények elölnézetben, polcok és polcközök arányos átméretezéssel, tárgyak rekeszenként, kereső; tervlap PNG, SVG, PDF (A4 fekvő, szekrényenként egy oldal), leltár CSV |
+| `polcrendezo.html` | Polcrendező: fali, álló, konyha- és fürdőszoba szekrények elölnézetben, polcok és polcközök arányos átméretezéssel, tárgyak rekeszenként, kereső; szekrénysorok egymás mellett (falnézet); tervlap PNG, SVG, PDF (A4 fekvő, soronként és szekrényenként egy oldal), leltár CSV |
 
 ## Kanapé-tervező
 
@@ -24,6 +24,7 @@ Kezdőlap: `index.html` (az appok listája, minden app fejlécében a ház ikon 
 - **Szekrények:** típus (fali, álló, konyha, fürdő), méret-sablonok, szélesség / magasság / mélység, lapvastagság, lábazat, munkalap, falra szerelt jelölés, oszlopok száma.
 - **Polcok:** oszloponként polcszám, polcköz (tiszta belmagasság) rekeszenként. Ha egy polcközt vagy a szekrény magasságát módosítod, a többi polcköz **arányosan** igazodik; a lakattal rögzített polcköz és oszlopszélesség nem változik. Egyenletes elosztás, polc beszúrása / eltávolítása, rekesz fajtája: polc vagy fiók.
 - **Tárgyak:** rekeszenként név, mennyiség, szín; áthúzással (vagy az „Áthelyezés…” listával) másik rekeszbe, akár másik szekrénybe vihetők. Rekeszkód: oszlopbetű + sorszám felülről (A1, B3), egy oszlopnál csak a sorszám.
+- **Szekrénysorok:** több szekrény egy sorba köthető (pl. konyha: alsók, fölöttük a felsők). „Teljes sor” nézetben egymás mellett látszanak: az álló szekrények a padlón balról jobbra, a falra szereltek a megadott magasságban (alsó él a padlótól), a magasabb álló szekrényeket kikerülve. Szekrényenként hézag adható meg előtte, a sorrend ◀ ▶ gombokkal változtatható. Gyors létrehozás: „Szekrénysor (több egyforma)…”, pl. 7 db × 40 cm. A sorról saját tervlap készül (rekeszkód: szekrény sorszáma / rekesz).
 - **Tárgyak és keresés:** az összes szekrény tartalma egy listában, ékezet nélkül is kereshető, „Mutasd” a rajzon kijelöli a rekeszt.
 - **Tervlap:** elölnézet méretekkel, rekesz-táblázat a tartalommal, fejléc. Billentyűk: nyilak a rekeszek között, Ctrl+Z / Ctrl+Y.
 
