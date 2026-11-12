@@ -4,9 +4,12 @@ Egyfájlos HTML bútortervező appok. Telefonon és laptopon is működnek, van 
 
 ## Appok
 
+Kezdőlap: `index.html` (az appok listája, minden app fejlécében a ház ikon ide visz vissza).
+
 | Fájl | App |
 |---|---|
 | `kanape.html` | Kanapé-tervező: felülnézet téglalap elemekből (ülőrész, bőr perem / könyöklő, háttámla, párna), automatikus méretláncok, oldalnézet, méret-táblázat, jelmagyarázat; tervlap export PNG, SVG és PDF (A4 fekvő) |
+| `polcrendezo.html` | Polcrendező: fali, álló, konyha- és fürdőszoba szekrények elölnézetben, polcok és polcközök arányos átméretezéssel, tárgyak rekeszenként, kereső; tervlap PNG, SVG, PDF (A4 fekvő, szekrényenként egy oldal), leltár CSV |
 
 ## Kanapé-tervező
 
@@ -16,6 +19,14 @@ Egyfájlos HTML bútortervező appok. Telefonon és laptopon is működnek, van 
 - **Tervlap:** a felülnézet az elemek nevével és méretével, fejléc (cím, projekt, megrendelő, tervező, dátum).
 - Sablonok: lépcsős sarokkanapé, egyenes 3 személyes, sarok recamiere-rel, U alakú.
 
+## Polcrendező
+
+- **Szekrények:** típus (fali, álló, konyha, fürdő), méret-sablonok, szélesség / magasság / mélység, lapvastagság, lábazat, munkalap, falra szerelt jelölés, oszlopok száma.
+- **Polcok:** oszloponként polcszám, polcköz (tiszta belmagasság) rekeszenként. Ha egy polcközt vagy a szekrény magasságát módosítod, a többi polcköz **arányosan** igazodik; a lakattal rögzített polcköz és oszlopszélesség nem változik. Egyenletes elosztás, polc beszúrása / eltávolítása, rekesz fajtája: polc vagy fiók.
+- **Tárgyak:** rekeszenként név, mennyiség, szín; áthúzással (vagy az „Áthelyezés…” listával) másik rekeszbe, akár másik szekrénybe vihetők. Rekeszkód: oszlopbetű + sorszám felülről (A1, B3), egy oszlopnál csak a sorszám.
+- **Tárgyak és keresés:** az összes szekrény tartalma egy listában, ékezet nélkül is kereshető, „Mutasd” a rajzon kijelöli a rekeszt.
+- **Tervlap:** elölnézet méretekkel, rekesz-táblázat a tartalommal, fejléc. Billentyűk: nyilak a rekeszek között, Ctrl+Z / Ctrl+Y.
+
 ## Fejlesztés
 
 A forrás a `src/` mappában van, a kész HTML-t a build szkript állítja elő:
@@ -23,8 +34,12 @@ A forrás a `src/` mappában van, a kész HTML-t a build szkript állítja elő:
 ```bash
 cd src
 python3 b_kp.py        # -> ../kanape.html
+python3 b_pr.py        # -> ../polcrendezo.html
+python3 b_index.py     # -> ../index.html (új app: egy sor az APPS listába)
 ```
 
 - `src/core.js`, `src/common.css`, `src/build.py`: közös app keret (fejléc, fülek, téma, menü, mezők)
 - `src/kp.js`: a kanapé-tervező logikája
 - `src/b_kp.py`: a kanapé-tervező színei, saját CSS-e, ikonja
+- `src/pr.js`, `src/b_pr.py`: a polcrendező logikája, illetve színei, CSS-e, ikonja
+- `src/b_index.py`: a kezdőlap

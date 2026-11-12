@@ -1,0 +1,396 @@
+/* ================= Polcrendező ================= */
+Object.assign(IC,{
+ cab:'<rect x="4" y="3" width="16" height="18" rx="1"/><path d="M4 9h16M4 15h16"/>',
+ list:'<path d="M9 6h12M9 12h12M9 18h12M4 6h.01M4 12h.01M4 18h.01"/>',
+ sheet:'<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 16h18M10 16v4M15 4v12"/>',
+ img:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/>',
+ redo:'<path d="m15 14 5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/>',
+ search:'<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>',
+ lock:'<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+ unlock:'<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-2"/>',
+ even:'<path d="M12 3v18M8 7l4-4 4 4M8 17l4 4 4-4"/>',
+ split:'<rect x="4" y="3" width="16" height="18" rx="1"/><path d="M4 12h16"/>',
+ minus:'<path d="M5 12h14"/>',go:'<path d="M5 12h14M13 6l6 6-6 6"/>',
+ tWall:'<path d="M3 3v18"/><rect x="7" y="5" width="13" height="11" rx="1"/><path d="M7 10.5h13"/>',
+ tTall:'<rect x="6" y="2" width="12" height="20" rx="1"/><path d="M6 8h12M6 14h12M12 14v8"/>',
+ tKit:'<rect x="5" y="2" width="14" height="5" rx="1"/><path d="M2 11h20"/><rect x="3" y="11" width="18" height="10" rx="1"/><path d="M12 11v10M9 15h-1M16 15h-1"/>',
+ tBath:'<rect x="6" y="2" width="12" height="9" rx="1"/><circle cx="12" cy="6.5" r="2"/><path d="M4 14h16v7H4zM12 14v7"/>'
+});
+let S;
+const INK='#1c2128',ACC='#0f766e',FONT='Inter,Arial,Helvetica,sans-serif';
+const BOARD='#e8d9bf',BOARD_D='#cdb58e',INNER='#fbf8f2',DRAWER='#f1e6d2',TOPC='#d4d4d8';
+const MINR=3;
+const TYP={fali:{n:'Fali szekrény',s:'Fali',ic:'tWall'},allo:{n:'Álló szekrény',s:'Álló',ic:'tTall'},konyha:{n:'Konyhaszekrény',s:'Konyha',ic:'tKit'},furdo:{n:'Fürdőszoba szekrény',s:'Fürdő',ic:'tBath'}};
+const ICOL=['#64748b','#dc2626','#ea580c','#ca8a04','#16a34a','#0891b2','#2563eb','#7c3aed','#db2777'];
+const ICOLN=['szürke','piros','narancs','sárga','zöld','türkiz','kék','lila','rózsaszín'];
+/* méret-sablonok: W,H,D cm; pl = lábazat, top = munkalap, sh = polcok száma, cols = oszlopok, fal = falra szerelt */
+const PRE={
+ fali:[['Fali szekrény 80×72',{W:80,H:72,D:35,sh:2,fal:1}],['Fali szekrény 60×90',{W:60,H:90,D:35,sh:3,fal:1}],['Nyitott fali polc 120×40',{W:120,H:40,D:25,sh:1,cols:2,fal:1}]],
+ allo:[['Ruhásszekrény 100×200',{W:100,H:200,D:60,pl:8,sh:5,cols:2}],['Könyvespolc 80×200',{W:80,H:200,D:30,pl:6,sh:5}],['Komód 80×90',{W:80,H:90,D:45,pl:8,sh:3,kind:'drawer'}]],
+ konyha:[['Konyha alsó 60',{W:60,H:90,D:60,pl:10,top:3.8,sh:1,kinds:['drawer','shelf'],hs:[1,3]}],['Konyha alsó fiókos 60',{W:60,H:90,D:60,pl:10,top:3.8,sh:2,kind:'drawer',hs:[1,1.6,2]}],['Konyha felső 60',{W:60,H:72,D:35,sh:2,fal:1}],['Konyha felső 80',{W:80,H:72,D:35,sh:2,fal:1}],['Kamraszekrény 60×210',{W:60,H:210,D:60,pl:10,sh:5}]],
+ furdo:[['Fürdőszobai magas 40×180',{W:40,H:180,D:30,pl:0,sh:4}],['Tükrös faliszekrény 60×70',{W:60,H:70,D:15,sh:2,fal:1}],['Mosdó alatti 60×55',{W:60,H:55,D:45,sh:1,fal:1}]]
+};
+const DEF={
+ p:{title:'POLCKIOSZTÁS',proj:'',author:'',date:'',hs:'1',tbl:'1',pdfAll:'1'},
+ c:{list:null,sel:'',cell:''}
+};
+S=loadState('pr',DEF);
+
+/* ---------- segédek ---------- */
+const f=v=>Math.round(v*100)/100;
+const r1=v=>Math.round(v*10)/10;
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const L1=v=>fmt(v,1);
+const tw=(s,fs)=>String(s).length*fs*.56;
+const norm=s=>String(s||'').normalize('NFD').replace(/\p{M}/gu,'').toLowerCase();
+const line=(x1,y1,x2,y2,w,c=INK,extra='')=>`<line x1="${f(x1)}" y1="${f(y1)}" x2="${f(x2)}" y2="${f(y2)}" stroke="${c}" stroke-width="${f(w)}"${extra}/>`;
+const rect=(x,y,w,h,fill,stroke='none',sw=1,extra='')=>`<rect x="${f(x)}" y="${f(y)}" width="${f(Math.max(0,w))}" height="${f(Math.max(0,h))}" fill="${fill}" stroke="${stroke}" stroke-width="${f(sw)}"${extra}/>`;
+const tx=(x,y,t,fs,wt=400,anc='start',fill=INK,extra='')=>`<text x="${f(x)}" y="${f(y)}" font-size="${f(fs)}" font-weight="${wt}" text-anchor="${anc}" fill="${fill}"${extra}>${esc(t)}</text>`;
+const trunc=(s,n)=>{s=String(s);return s.length>n?s.slice(0,Math.max(1,n-1))+'…':s};
+function wrap(t,n){const ws=String(t).split(/\s+/).filter(Boolean),ls=[];let cur='';
+ for(const w of ws){const c=cur?cur+' '+w:w;if(c.length<=n||!cur)cur=c;else{ls.push(cur);cur=w}}if(cur)ls.push(cur);
+ return ls.map(l=>l.length>n?trunc(l,n):l)}
+const clearW=c=>c.W-2*c.t-(c.cols.length-1)*c.t;
+const clearH=(c,col)=>c.H-(c.pl||0)-(c.top||0)-2*c.t-(col.rows.length-1)*c.t;
+const letter=i=>String.fromCharCode(65+i%26)+(i>=26?Math.floor(i/26):'');
+const code=(c,ci,ri)=>c.cols.length>1?letter(ci)+(ri+1):String(ri+1);
+const itemLabel=it=>it.q&&String(it.q).trim()&&String(it.q).trim()!=='1'?`${it.n} (${String(it.q).trim()}${/^\d+([.,]\d+)?$/.test(String(it.q).trim())?' db':''})`:it.n;
+const cab=()=>S.c.list.find(c=>c.id===S.c.sel)||S.c.list[0]||null;
+function findRow(id){for(const c of S.c.list)for(let ci=0;ci<c.cols.length;ci++){const col=c.cols[ci];const ri=col.rows.findIndex(r=>r.id===id);if(ri>=0)return {c,ci,col,ri,row:col.rows[ri]}}return null}
+function findItem(id){for(const c of S.c.list)for(let ci=0;ci<c.cols.length;ci++)for(let ri=0;ri<c.cols[ci].rows.length;ri++){const row=c.cols[ci].rows[ri];const ii=row.items.findIndex(x=>x.id===id);if(ii>=0)return {c,ci,ri,row,ii,it:row.items[ii]}}return null}
+const allItems=()=>{const o=[];for(const c of S.c.list)c.cols.forEach((col,ci)=>col.rows.forEach((row,ri)=>row.items.forEach(it=>o.push({c,ci,ri,row,it}))));return o};
+const nItems=c=>c.cols.reduce((s,col)=>s+col.rows.reduce((t,r)=>t+r.items.length,0),0);
+
+/* ---------- arányos méretezés ----------
+   A rögzítetlen elemek egymás közti aránya megmarad, a rögzített (lakat) és az éppen szerkesztett elem mérete nem változik. */
+function fit(arr,key,total,keep=-1){const n=arr.length;if(!n)return;
+ if(n===1){arr[0][key]=r1(total);return}
+ let fx=[],fl=[];arr.forEach((x,i)=>(i===keep||x.lock?fx:fl).push(i));
+ if(!fl.length){fl=arr.map((_,i)=>i).filter(i=>i!==keep);fx=keep>=0?[keep]:[]}
+ const sf=fx.reduce((s,i)=>s+(+arr[i][key]||0),0);let free=total-sf;
+ if(free<fl.length*MINR){free=fl.length*MINR;const rem=total-free;fx.forEach(i=>arr[i][key]=sf>0?Math.max(MINR,arr[i][key]*rem/sf):MINR)}
+ const sl=fl.reduce((s,i)=>s+Math.max(0,+arr[i][key]||0),0);
+ fl.forEach(i=>arr[i][key]=sl>0?Math.max(0,+arr[i][key]||0)*free/sl:free/fl.length);
+ arr.forEach(x=>x[key]=r1(x[key]));
+ const diff=r1(total-arr.reduce((s,x)=>s+x[key],0)),li=fl[fl.length-1];arr[li][key]=r1(arr[li][key]+diff)}
+function fitCab(c,colKeep=-1){fit(c.cols,'w',clearW(c),colKeep);for(const col of c.cols)fit(col.rows,'h',clearH(c,col))}
+function evenOut(arr,key,total){arr.forEach(x=>{x[key]=1;x.lock=0});fit(arr,key,total)}
+const mkRow=(h,kind='shelf')=>({id:uid(),h,lock:0,kind,items:[]});
+function mkCab(type,pi=0,nm){const [pn,p]=PRE[type][pi];
+ const c={id:uid(),name:nm||pn,type,W:p.W,H:p.H,D:p.D,t:p.t||1.8,pl:p.pl||0,top:p.top||0,fal:p.fal?1:0,cols:[]};
+ const nc=p.cols||1,n=(p.sh??2)+1;
+ for(let i=0;i<nc;i++){const rows=[];for(let r=0;r<n;r++)rows.push(mkRow((p.hs?p.hs[r]:1)*10,(p.kinds&&p.kinds[r])||p.kind||'shelf'));c.cols.push({id:uid(),w:10,lock:0,rows})}
+ fitCab(c);return c}
+const mkIt=(n,q='',col=0)=>({id:uid(),n,q,col});
+function demo(){
+ const a=mkCab('konyha',3,'Konyha felső – mosogató felett');
+ a.cols[0].rows[0].items=[mkIt('Ünnepi tányérok','',7),mkIt('Tálak, salátástálak')];
+ a.cols[0].rows[1].items=[mkIt('Poharak','12',5),mkIt('Bögrék','8',5)];
+ a.cols[0].rows[2].items=[mkIt('Lapostányérok','6',6),mkIt('Mélytányérok','6',6),mkIt('Kistányérok','6',6)];
+ const b=mkCab('konyha',1,'Konyha alsó – fiókos');
+ b.cols[0].rows[0].items=[mkIt('Evőeszközök','',3),mkIt('Konyhai eszközök (merőkanál, spatula)')];
+ b.cols[0].rows[1].items=[mkIt('Konyharuhák'),mkIt('Alufólia, folpack, sütőpapír')];
+ b.cols[0].rows[2].items=[mkIt('Lábasok, fedők','',1),mkIt('Serpenyők','',1)];
+ const d=mkCab('furdo',0,'Fürdőszoba – magas szekrény');
+ d.cols[0].rows[0].items=[mkIt('Tartalék tisztítószerek','',1)];
+ d.cols[0].rows[1].items=[mkIt('Törölközők','',6)];
+ d.cols[0].rows[2].items=[mkIt('Fürdőlepedők','',6)];
+ d.cols[0].rows[3].items=[mkIt('Tusfürdők, samponok','',7),mkIt('Fogkrém, fogkefék')];
+ d.cols[0].rows[4].items=[mkIt('Hajszárító'),mkIt('Elsősegély doboz','',1)];
+ const e=mkCab('allo',0,'Hálószoba – ruhásszekrény');
+ const L=e.cols[0].rows,R=e.cols[1].rows;
+ L[0].items=[mkIt('Bőröndök')];L[1].items=[mkIt('Pulóverek','',2)];L[2].items=[mkIt('Pólók','',2)];L[3].items=[mkIt('Nadrágok','',2)];L[4].items=[mkIt('Zoknik, alsóneműk')];L[5].items=[mkIt('Cipősdobozok')];
+ R[0].items=[mkIt('Ágyneműk','',6)];R[1].items=[mkIt('Plédek','',6)];R[2].items=[mkIt('Ingek, blúzok','',7)];R[3].items=[mkIt('Sportruhák','',4)];R[4].items=[mkIt('Táskák')];R[5].items=[mkIt('Téli kiegészítők (sál, sapka)')];
+ return [a,b,d,e]}
+function sanitize(list){return (Array.isArray(list)?list:[]).filter(c=>c&&Array.isArray(c.cols)).map(c=>{
+ const o={id:c.id||uid(),name:String(c.name||'Szekrény'),type:TYP[c.type]?c.type:'allo',W:Math.max(5,+c.W||60),H:Math.max(5,+c.H||60),D:Math.max(1,+c.D||30),t:clamp(+c.t||1.8,.3,10),pl:Math.max(0,+c.pl||0),top:Math.max(0,+c.top||0),fal:c.fal?1:0,
+  cols:c.cols.filter(x=>x&&Array.isArray(x.rows)&&x.rows.length).map(x=>({id:x.id||uid(),w:+x.w||10,lock:x.lock?1:0,rows:x.rows.map(r=>({id:r.id||uid(),h:+r.h||10,lock:r.lock?1:0,kind:r.kind==='drawer'?'drawer':'shelf',items:(Array.isArray(r.items)?r.items:[]).map(it=>({id:it.id||uid(),n:String(it.n||''),q:String(it.q??''),col:clamp(+it.col||0,0,ICOL.length-1)}))}))}))};
+ if(!o.cols.length)o.cols=[{id:uid(),w:10,lock:0,rows:[mkRow(10)]}];return o})}
+S.c.list=Array.isArray(S.c.list)?sanitize(S.c.list):demo();
+
+/* ---------- visszavonás ---------- */
+let U=[],RD=[];
+const snap=()=>JSON.stringify({p:S.p,list:S.c.list});
+function hist(){const s=snap();if(U[U.length-1]===s)return;U.push(s);if(U.length>80)U.shift();RD=[]}
+function restore(s){const d=parse(s);if(!d)return;S.p=d.p;S.c.list=d.list;ui.save();ui.render()}
+function undo(){if(!U.length){toast('Nincs mit visszavonni');return}const cur=snap();let s=U.pop();while(s===cur&&U.length)s=U.pop();if(s===cur){toast('Nincs mit visszavonni');return}RD.push(cur);restore(s)}
+function redo(){if(!RD.length){toast('Nincs mit újra végrehajtani');return}U.push(snap());restore(RD.pop())}
+
+/* ---------- rajz ---------- */
+function dimH(y,x1,x2,lab,fs,ext){let o=line(x1,y,x2,y,1);
+ for(const x of[x1,x2])o+=line(x-3.5,y+3.5,x+3.5,y-3.5,1.4)+(ext!=null?line(x,ext,x,y+(y>ext?5:-5),.6,'#94a3b8'):'');
+ const w=tw(lab,fs);const fsz=x2-x1<w+6?Math.max(7,fs*.8):fs;
+ return o+tx((x1+x2)/2,y-4,lab,fsz,600,'middle')}
+function dimV(x,y1,y2,lab,fs,ext){let o=line(x,y1,x,y2,1);
+ for(const y of[y1,y2])o+=line(x-3.5,y+3.5,x+3.5,y-3.5,1.4)+(ext!=null?line(ext,y,x-5,y,.6,'#94a3b8'):'');
+ const w=tw(lab,fs);const fsz=y2-y1<w+6?Math.max(7,fs*.8):fs;
+ return o+tx(x-4,(y1+y2)/2,lab,fsz,600,'middle',INK,` transform="rotate(-90 ${f(x-4)} ${f((y1+y2)/2)})"`)}
+/* elölnézet; bx: {x,y,w,h} a rendelkezésre álló doboz. o: {edit, sel, fs, dfs, hs, pid} */
+function frontSVG(c,bx,o={}){
+ const fsMax=o.fs||13,dfs=o.dfs||12,nC=c.cols.length,t=c.t,pl=c.pl||0,top=c.top||0;
+ const inner=pl>0||top>0;
+ const mL=inner?58:36,mR=12,mT=c.fal?18:10,mB=(nC>1?54:30)+(c.fal?0:8);
+ const s=Math.max(.05,Math.min((bx.w-mL-mR)/c.W,(bx.h-mT-mB)/c.H));
+ const dw=c.W*s,dh=c.H*s;
+ const ox=bx.x+mL+((bx.w-mL-mR)-dw)/2,oy=bx.y+mT+((bx.h-mT-mB)-dh)/2;
+ const X=v=>ox+v*s,Y=v=>oy+v*s;
+ let g='',defs='';const cells=[];
+ if(c.fal){g+=line(X(-14),Y(0)-7,X(c.W+14),Y(0)-7,1.2,'#94a3b8',' stroke-dasharray="5 3"');g+=tx(X(c.W),Y(0)-10,'falra szerelve',Math.max(8,dfs*.75),500,'end','#94a3b8')}
+ else{g+=line(X(-16),Y(c.H),X(c.W+16),Y(c.H),1.6,'#94a3b8');for(let x=-16;x<c.W+16;x+=Math.max(1,10/s))g+=line(X(x),Y(c.H)+6,X(x)+6,Y(c.H),.6,'#cbd5e1')}
+ if(top>0)g+=rect(X(-1.5),Y(0),(c.W+3)*s,top*s,TOPC,INK,1.2);
+ g+=rect(X(0),Y(top),dw,(c.H-top-pl)*s,BOARD,INK,1.4);
+ if(pl>0)g+=rect(X(Math.min(4,c.W*.05)),Y(c.H-pl),(c.W-2*Math.min(4,c.W*.05))*s,pl*s,BOARD_D,INK,1);
+ let xc=t;
+ c.cols.forEach((col,ci)=>{let yc=top+t;
+  col.rows.forEach((row,ri)=>{const x=X(xc),y=Y(yc),w=Math.max(0,col.w*s),h=Math.max(0,row.h*s),dr=row.kind==='drawer',sel=o.sel===row.id;
+   cells.push({id:row.id,x,y,w,h});
+   g+=rect(x,y,w,h,dr?DRAWER:INNER,INK,.8,o.edit?` data-cell="${row.id}" style="cursor:pointer"`:'');
+   if(dr&&w>8&&h>8){g+=rect(x+2.5,y+2.5,w-5,h-5,'none','#b9a27e',.8,' pointer-events="none"');const hy=y+Math.min(h*.22,12)+3;g+=line(x+w*.38,hy,x+w*.62,hy,2.2,'#6b7280',' stroke-linecap="round" pointer-events="none"')}
+   const cid=`${o.pid||'c'}_${row.id}`;defs+=`<clipPath id="${cid}"><rect x="${f(x)}" y="${f(y)}" width="${f(w)}" height="${f(h)}"/></clipPath>`;
+   let cg='';const cd=code(c,ci,ri),fsC=clamp(h*.32,7,fsMax*.82);
+   if(h>=10&&w>=14){cg+=tx(x+4,y+fsC+2,cd,fsC,700,'start','#64748b');
+    if(o.hs&&w>tw(cd,fsC)+tw(L1(row.h),fsC)+14)cg+=tx(x+w-4,y+fsC+2,L1(row.h),fsC,500,'end','#94a3b8')}
+   const its=row.items,top0=y+fsC+5,avail=y+h-3-top0;
+   if(its.length&&avail>=7&&w>=24){let fs=clamp(avail/(its.length*1.3),8,fsMax);let maxL=Math.floor(avail/(fs*1.3));
+    if(maxL<1){fs=Math.max(7,avail/1.3);maxL=1}
+    let show=its.length>maxL?maxL-1:its.length;const maxCh=Math.max(3,Math.floor((w-10-fs)/(fs*.56)));
+    for(let i=0;i<show;i++){const it=its[i],ly=top0+(i+1)*fs*1.3-fs*.28;
+     cg+=`<g${o.edit?` data-it="${it.id}" data-row="${row.id}" pointer-events="all" style="cursor:grab;touch-action:none"`:''}>${o.edit?rect(x+2,ly-fs*1.05,w-4,fs*1.3,'transparent'):''}${rect(x+5,ly-fs*.72,fs*.68,fs*.68,ICOL[it.col]||ICOL[0],'none',0,` rx="${f(fs*.15)}"`)}${tx(x+5+fs,ly,trunc(itemLabel(it)||'(névtelen)',maxCh),fs,500)}</g>`}
+    if(show<its.length){const ly=top0+(show+1)*fs*1.3-fs*.28;cg+=tx(x+5,ly,show?`+${its.length-show} további`:`${its.length} tárgy`,fs,600,'start','#64748b',' font-style="italic"')}}
+   g+=`<g clip-path="url(#${cid})" pointer-events="none">${cg}</g>`;
+   if(sel)g+=rect(x+1,y+1,w-2,h-2,ACC,ACC,2.6,' fill-opacity=".08" pointer-events="none"');
+   yc+=row.h+t});
+  xc+=col.w+t});
+ /* méretek */
+ g+=dimV(X(0)-(inner?44:24),Y(0),Y(c.H),L1(c.H),dfs,X(0));
+ if(inner){let y0=0;const seg=[];if(top>0)seg.push([0,top]);seg.push([top,c.H-pl]);if(pl>0)seg.push([c.H-pl,c.H]);
+  for(const [a,b] of seg)g+=dimV(X(0)-20,Y(a),Y(b),L1(b-a),dfs*.85,X(0))}
+ const yb=Y(c.H)+(c.fal?0:8);
+ if(nC>1){let x0=t;for(const col of c.cols){g+=dimH(yb+18,X(x0),X(x0+col.w),L1(col.w),dfs*.85,Y(c.H));x0+=col.w+t}}
+ g+=dimH(yb+(nC>1?44:22),X(0),X(c.W),L1(c.W),dfs,Y(c.H));
+ return {svg:`<defs>${defs}</defs>`+g,cells,s}}
+
+/* ---------- tervlap ---------- */
+const SW=1414,SH=1000;
+function sheetSVG(c){const p=S.p,M=16;
+ let o=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${SW} ${SH}" width="${SW}" height="${SH}" font-family="${FONT}"><rect width="${SW}" height="${SH}" fill="#fff"/>`;
+ o+=rect(M,M,SW-2*M,SH-2*M,'none',INK,2.2);
+ const tbH=76,ty=SH-M-tbH,W0=SW-2*M;o+=line(M,ty,SW-M,ty,2.2);
+ const cw=[.27,.25,.18,.17,.13].map(k=>k*W0);let cx=M;
+ const cellsTB=[[p.proj||'Projekt',p.title||''],['Szekrény',c.name],['Típus',TYP[c.type].n],['Külső méret (sz × m × mé)',`${L1(c.W)} × ${L1(c.H)} × ${L1(c.D)} cm`],[p.date||'Dátum',p.author||'']];
+ cellsTB.forEach(([a,b],i)=>{if(i)o+=line(cx,ty,cx,SH-M,1.4);const w=cw[i],n=Math.floor((w-24)/(13*.56));
+  if(i===0){o+=tx(cx+12,ty+32,trunc(b||'POLCKIOSZTÁS',Math.floor((w-24)/(20*.6))),20,800);o+=tx(cx+12,ty+56,trunc(a,n),13,500,'start','#475569')}
+  else{o+=tx(cx+12,ty+26,trunc(a,n),11.5,600,'start','#64748b');o+=tx(cx+12,ty+52,trunc(b||'–',Math.floor((w-24)/(16*.58))),16,700)}
+  cx+=w});
+ const its=nItems(c),tbl=p.tbl&&its>0,top=M+20,bot=ty-20,dx=M+20,dw=tbl?Math.min(800,(SW-2*M)*.56):SW-2*M-40;
+ const fr=frontSVG(c,{x:dx,y:top+24,w:dw,h:bot-top-24},{fs:15,dfs:15,hs:!!p.hs,pid:'s'+c.id});
+ o+=tx(dx,top+12,'Elölnézet (ajtók nélkül) – méretek cm-ben',13,600,'start','#64748b');
+ o+=fr.svg;
+ if(tbl){const px=dx+dw+28,pw=SW-M-20-px,c1=56,c2=118,c3=pw-c1-c2;
+  const rows=[];c.cols.forEach((col,ci)=>col.rows.forEach((row,ri)=>rows.push({cd:code(c,ci,ri),sz:`${L1(col.w)} × ${L1(row.h)}`,dr:row.kind==='drawer',txt:(row.kind==='drawer'?'Fiók: ':'')+(row.items.map(itemLabel).join(', ')||'–'),e:!row.items.length})));
+  const hH=30,avail=bot-top-hH-26;let fs=15,lay;
+  const doLay=fs=>{const n=Math.max(8,Math.floor((c3-16)/(fs*.56))),lh=fs*1.32;return rows.map(r=>{const ls=wrap(r.txt,n);return {...r,ls,h:Math.max(1,ls.length)*lh+10,lh}})};
+  for(fs=15;fs>=9;fs--){lay=doLay(fs);if(lay.reduce((s,r)=>s+r.h,0)<=avail)break}
+  if(fs<9)fs=9;
+  o+=rect(px,top,pw,hH,'#f1f5f9',INK,1.2);
+  o+=tx(px+8,top+20,'Rekesz',12,700,'start','#334155')+tx(px+c1+8,top+20,'Belméret (sz × m)',12,700,'start','#334155')+tx(px+c1+c2+8,top+20,'Tartalom',12,700,'start','#334155');
+  let y=top+hH,cut=0;
+  for(let i=0;i<lay.length;i++){const r=lay[i];let ls=r.ls,h=r.h;
+   if(y+h>top+hH+avail){const fitL=Math.floor((top+hH+avail-y-10)/r.lh);if(fitL<1){cut=lay.length-i;break}ls=ls.slice(0,fitL);ls[fitL-1]=trunc(ls[fitL-1],Math.max(4,ls[fitL-1].length-1))+'…';h=fitL*r.lh+10;cut=lay.length-i-1}
+   if(i%2)o+=rect(px,y,pw,h,'#fafafa');
+   o+=tx(px+8,y+fs+3,r.cd,fs,800,'start',ACC)+tx(px+c1+8,y+fs+3,r.sz,fs*.9,500,'start','#475569');
+   ls.forEach((l,k)=>o+=tx(px+c1+c2+8,y+fs+3+k*r.lh,l,fs,r.e?400:500,'start',r.e?'#94a3b8':INK));
+   y+=h;o+=line(px,y,px+pw,y,.6,'#cbd5e1');if(cut)break}
+  o+=rect(px,top,pw,y-top,'none',INK,1.2)+line(px+c1,top,px+c1,y,.6,'#cbd5e1')+line(px+c1+c2,top,px+c1+c2,y,.6,'#cbd5e1');
+  o+=tx(px,y+20,cut?`+${cut} rekesz nem fért ki – a teljes lista a CSV leltárban.`:'A rekeszmagasság a polcok közötti tiszta (bel)méret. Számozás felülről lefelé.',11.5,500,'start','#64748b')}
+ return o+'</svg>'}
+
+/* ---------- szerkesztő ---------- */
+let EV=null,DR=null;
+function drawEditor(){const cv=$('#pr_cv');if(!cv)return;const c=cab();
+ if(!c){cv.innerHTML='<div class="empty">Nincs még szekrény. Adj hozzá egyet fent az „Új szekrény” listából.</div>';EV=null;return}
+ const vw=Math.max(300,cv.clientWidth-2),maxH=Math.round(clamp(innerHeight*.66,380,780)),need=(vw-12-70)/c.W*c.H+100,vh=Math.round(clamp(need,260,maxH));
+ const fr=frontSVG(c,{x:6,y:6,w:vw-12,h:vh-12},{edit:1,sel:S.c.cell,fs:13,dfs:12,hs:!!S.p.hs,pid:'e'});
+ EV={vw,vh,cells:fr.cells};
+ cv.innerHTML=`<svg viewBox="0 0 ${vw} ${vh}" width="${vw}" height="${vh}" font-family="${FONT}" aria-label="Szekrény elölnézet">${fr.svg}<rect id="pr_hl" x="0" y="0" width="0" height="0" fill="${ACC}" fill-opacity=".18" stroke="${ACC}" stroke-width="2.5" stroke-dasharray="6 4" pointer-events="none" visibility="hidden"/></svg>`}
+function toSvg(e){const svg=$('#pr_cv svg');if(!svg)return null;const r=svg.getBoundingClientRect();return {x:(e.clientX-r.left)*EV.vw/r.width,y:(e.clientY-r.top)*EV.vh/r.height}}
+const cellAt=p=>p&&EV?EV.cells.find(q=>p.x>=q.x&&p.x<=q.x+q.w&&p.y>=q.y&&p.y<=q.y+q.h):null;
+function selectCell(id){S.c.cell=id;const fr=findRow(id);if(fr)S.c.sel=fr.c.id;ui.save();drawEditor();renderPanel()}
+document.addEventListener('pointerdown',e=>{const cv=e.target.closest('#pr_cv');if(!cv||e.button>0||!EV)return;
+ const it=e.target.closest('[data-it]'),ce=e.target.closest('[data-cell]');
+ if(it){DR={id:it.dataset.it,from:it.dataset.row,x:e.clientX,y:e.clientY,mv:0};try{cv.setPointerCapture(e.pointerId)}catch(_){}e.preventDefault();return}
+ if(ce)selectCell(ce.dataset.cell)});
+document.addEventListener('pointermove',e=>{if(!DR)return;if(!DR.mv){if(Math.hypot(e.clientX-DR.x,e.clientY-DR.y)<5)return;DR.mv=1;
+  const fi=findItem(DR.id);const gh=document.createElement('div');gh.id='pr_ghost';gh.textContent=fi?itemLabel(fi.it):'';document.body.appendChild(gh)}
+ const gh=$('#pr_ghost');if(gh){gh.style.left=e.clientX+12+'px';gh.style.top=e.clientY+8+'px'}
+ const q=cellAt(toSvg(e)),hl=$('#pr_hl');if(hl){if(q&&q.id!==DR.from){hl.setAttribute('x',q.x);hl.setAttribute('y',q.y);hl.setAttribute('width',q.w);hl.setAttribute('height',q.h);hl.setAttribute('visibility','visible')}else hl.setAttribute('visibility','hidden')}});
+function endDrag(e,cancel){if(!DR)return;const d=DR;DR=null;const gh=$('#pr_ghost');if(gh)gh.remove();
+ if(cancel)return drawEditor();
+ if(!d.mv){selectCell(d.from);const inp=document.getElementById('in_'+d.id);if(inp&&matchMedia('(pointer:fine)').matches)inp.focus();return}
+ const q=cellAt(toSvg(e));if(q&&q.id!==d.from)moveItem(d.id,q.id);else drawEditor()}
+document.addEventListener('pointerup',e=>endDrag(e));
+document.addEventListener('pointercancel',e=>endDrag(e,1));
+function moveItem(iid,rowId,silent){const fi=findItem(iid),tr=findRow(rowId);if(!fi||!tr||fi.row.id===rowId)return;hist();
+ fi.row.items.splice(fi.ii,1);tr.row.items.push(fi.it);S.c.sel=tr.c.id;S.c.cell=rowId;ui.save();drawEditor();renderPanel();renderTabs();
+ if(!silent)toast(`${fi.it.n||'Tárgy'} → ${tr.c.name}, ${code(tr.c,tr.ci,tr.ri)}`)}
+function stats(){const el=$('#pr_stats'),c=cab();if(!el)return;if(!c){el.innerHTML='';return}
+ const sh=c.cols.reduce((s,col)=>s+col.rows.length-1,0),nr=c.cols.reduce((s,col)=>s+col.rows.length,0),dr=c.cols.reduce((s,col)=>s+col.rows.filter(r=>r.kind==='drawer').length,0);
+ el.innerHTML=`<div class="kv"><small>Külső méret (sz × m × mé)</small><b style="font-size:17px">${L1(c.W)} × ${L1(c.H)} × ${L1(c.D)}</b><i>cm</i></div><div class="kv"><small>Belső mélység</small><b>${L1(Math.max(0,c.D-c.t))}</b><i>cm</i></div><div class="kv"><small>Polcok / rekeszek${dr?' / fiókok':''}</small><b>${sh} / ${nr}${dr?' / '+dr:''}</b></div><div class="kv"><small>Tárgyak</small><b>${nItems(c)}</b><i>tétel</i></div>`;
+ const pl=$('#pr_pill');if(pl){const bad=[];if(clearW(c)<c.cols.length*MINR)bad.push('A szélesség túl kicsi az oszlopokhoz');c.cols.forEach((col,ci)=>{if(clearH(c,col)<col.rows.length*MINR)bad.push(`${c.cols.length>1?letter(ci)+' oszlop: ':''}a magasság túl kicsi ennyi polchoz`)});
+  pl.className='pill '+(bad.length?'bad':'ok');pl.textContent=bad.length?'Ellenőrizd a méreteket':'Méretek rendben';pl.title=bad.join('\n')}}
+function renderTabs(){const el=$('#pr_tabs');if(!el)return;const c=cab();
+ el.innerHTML=S.c.list.map(x=>`<button class="ctab${c&&x.id===c.id?' on':''}" data-act="pick" data-id="${x.id}">${ic(TYP[x.type].ic,16)}<span>${esc(x.name||'Szekrény')}</span><small>${nItems(x)}</small></button>`).join('')+
+ `<select class="sel addc" id="pr_add" aria-label="Új szekrény"><option value="">+ Új szekrény…</option>${Object.entries(PRE).map(([k,a])=>`<optgroup label="${TYP[k].n}">${a.map(([n],i)=>`<option value="${k}:${i}">${esc(n)}</option>`).join('')}</optgroup>`).join('')}</select>`}
+const numIn=(id,label,v,attr,u='cm',lockable)=>`<div class="f"><label for="${id}">${label}</label><div class="iw"><input id="${id}" ${attr} inputmode="decimal" autocomplete="off" value="${esc(v)}"><span class="u">${u}</span>${lockable?lockable:''}</div></div>`;
+const lockBtn=(on,act,title)=>`<button type="button" class="lk${on?' on':''}" data-act="${act}" title="${title}" aria-pressed="${on?'true':'false'}">${ic(on?'lock':'unlock',15)}</button>`;
+function moveOpts(cur){return `<option value="">Áthelyezés…</option>`+S.c.list.map(c=>`<optgroup label="${esc(c.name)}">${c.cols.map((col,ci)=>col.rows.map((r,ri)=>`<option value="${r.id}" ${r.id===cur?'disabled':''}>${esc(code(c,ci,ri))}${r.items.length?` – ${esc(trunc(r.items.map(x=>x.n).join(', '),28))}`:''}</option>`).join('')).join('')}</optgroup>`).join('')}
+function renderPanel(){const el=$('#pr_props');if(!el)return;const c=cab();
+ if(!c){el.innerHTML='';return}
+ let fr=S.c.cell?findRow(S.c.cell):null;if(fr&&fr.c.id!==c.id)fr=null;
+ const tsel=Object.entries(TYP).map(([k,v])=>`<button type="button" class="${c.type===k?'on':''}" data-act="ctype" data-v="${k}">${v.s}</button>`).join('');
+ let h=`<div class="card"><h2><span>Szekrény</span><span class="row" style="gap:4px"><button class="btn sm" data-act="cdup" title="Másolat">${ic('copy',14)}</button><button class="btn sm danger" data-act="cdel" title="Szekrény törlése">${ic('trash',14)}</button></span></h2>
+  <div class="f"><label for="cf_name">Megnevezés</label><input class="txt" id="cf_name" data-cname value="${esc(c.name)}" autocomplete="off"></div>
+  <div class="f"><span class="l">Típus</span><div class="seg">${tsel}</div></div>
+  <select class="sel" id="pr_pre"><option value="">Méret-sablon (${TYP[c.type].s})…</option>${PRE[c.type].map(([n],i)=>`<option value="${i}">${esc(n)}</option>`).join('')}</select>
+  <div class="fields f3">${numIn('cf_W','Szélesség',L1(c.W),'data-cf="W"')}${numIn('cf_H','Magasság',L1(c.H),'data-cf="H"')}${numIn('cf_D','Mélység',L1(c.D),'data-cf="D"')}${numIn('cf_t','Lapvastagság',L1(c.t),'data-cf="t"')}${numIn('cf_pl','Lábazat',L1(c.pl),'data-cf="pl"')}${numIn('cf_top','Munkalap',L1(c.top),'data-cf="top"')}${numIn('cf_nc','Oszlopok',c.cols.length,'data-cnc','db')}</div>
+  <label class="ck"><input type="checkbox" id="cf_fal" data-cfal ${c.fal?'checked':''}>Falra szerelt (nincs padló alatta)</label>
+  <p class="hint">A magasság a lábazattal és a munkalappal együtt értendő. Méretváltozáskor a polcközök <b>arányosan</b> változnak, a lakattal rögzítettek nem.</p></div>`;
+ if(fr){const {col,ci,ri,row}=fr,cd=code(c,ci,ri),nC=c.cols.length;
+  h+=`<div class="card"><h2><span>${nC>1?`${letter(ci)} oszlop`:'Polcok'}</span></h2>
+   <div class="fields f2">${nC>1?numIn('cl_w','Oszlop belső szélessége',L1(col.w),'data-colw','cm',lockBtn(col.lock,'clock','Szélesség rögzítése')):''}${numIn('cl_n','Polcok száma',col.rows.length-1,'data-coln','db')}</div>
+   <div class="row"><button class="btn sm" data-act="ceven">${ic('even',14)}Egyenletes elosztás</button></div>
+   <p class="hint">${col.rows.length} rekesz, összesen ${L1(clearH(c,col))} cm tiszta magasság.</p></div>`;
+  h+=`<div class="card"><h2><span>Rekesz ${esc(cd)}</span><span class="pill na">${row.items.length} tárgy</span></h2>
+   <div class="row"><div class="seg"><button type="button" class="${row.kind!=='drawer'?'on':''}" data-act="rkind" data-v="shelf">Polc</button><button type="button" class="${row.kind==='drawer'?'on':''}" data-act="rkind" data-v="drawer">Fiók</button></div></div>
+   <div class="fields f2">${numIn('rw_h','Belmagasság (polcköz)',L1(row.h),'data-rowh','cm',lockBtn(row.lock,'rlock','Magasság rögzítése'))}</div>
+   <div class="row"><button class="btn sm" data-act="rsplit" title="A rekeszt egy új polccal kettéosztja">${ic('split',14)}Polc beszúrása</button><button class="btn sm" data-act="rmerge" ${col.rows.length<2?'disabled':''} title="A rekesz alatti polcot elveszi (az utolsónál a felette lévőt)">${ic('minus',14)}Polc eltávolítása</button></div>
+   <div class="ilist">${row.items.map(it=>`<div class="irow"><button type="button" class="cdot" data-act="icol" data-id="${it.id}" style="background:${ICOL[it.col]}" title="Szín: ${ICOLN[it.col]} (katt: következő)"></button><input class="txt" id="in_${it.id}" data-in="${it.id}" value="${esc(it.n)}" placeholder="Tárgy neve" autocomplete="off"><input class="txt q" id="iq_${it.id}" data-iq="${it.id}" value="${esc(it.q)}" placeholder="db" autocomplete="off"><select class="sel mv" data-imv="${it.id}" aria-label="Áthelyezés">${moveOpts(row.id)}</select><button class="btn sm" data-act="iup" data-id="${it.id}" title="Feljebb a listában" aria-label="Feljebb">↑</button><button class="btn sm" data-act="idel" data-id="${it.id}" aria-label="Törlés">${ic('trash',14)}</button></div>`).join('')||'<p class="hint">Ez a rekesz még üres.</p>'}</div>
+   <div class="addrow"><input class="txt" id="pr_new" placeholder="Új tárgy… (Enter)" autocomplete="off"><button class="btn sm pri" data-act="iadd">${ic('plus',14)}Hozzáad</button></div>
+   <p class="hint">Több tárgy egyszerre: pontosvesszővel elválasztva (pl. Kávé; Tea; Cukor). A rajzon a tárgyak áthúzhatók egy másik rekeszbe (telefonon az „Áthelyezés…” listával).</p></div>`}
+ else h+=`<div class="card"><p class="hint" style="margin:0">Koppints egy rekeszre a rajzon: ott adhatod meg a polcközt, a polcok számát és a tárgyakat.</p></div>`;
+ el.innerHTML=h;stats()}
+function refresh(){ui.save();drawEditor();renderPanel();renderTabs()}
+function later(fn){setTimeout(()=>{const aid=document.activeElement&&document.activeElement.id;fn();if(aid){const el=document.getElementById(aid);if(el&&document.activeElement!==el){el.focus();if(el.select&&el.tagName==='INPUT')el.select()}}},0)}
+
+/* ---------- műveletek ---------- */
+function setCols(c,n){n=clamp(Math.round(n),1,8);if(n===c.cols.length)return;
+ if(n>c.cols.length){const last=c.cols[c.cols.length-1];while(c.cols.length<n)c.cols.push({id:uid(),w:last.w,lock:0,rows:last.rows.map(r=>mkRow(r.h,r.kind))})}
+ else{const rem=c.cols.splice(n);const tgt=c.cols[c.cols.length-1];rem.forEach(col=>col.rows.forEach((r,ri)=>{const t=tgt.rows[Math.min(ri,tgt.rows.length-1)];t.items.push(...r.items)}))}
+ c.cols.forEach(x=>x.lock=0);evenOut(c.cols,'w',clearW(c));for(const col of c.cols)fit(col.rows,'h',clearH(c,col))}
+function setRows(c,col,n){n=clamp(Math.round(n),1,40);if(n===col.rows.length)return;
+ if(n>col.rows.length){const avg=col.rows.reduce((s,r)=>s+r.h,0)/col.rows.length;while(col.rows.length<n)col.rows.push(mkRow(avg))}
+ else{const rem=col.rows.splice(n);col.rows[n-1].items.push(...rem.flatMap(r=>r.items));if(!col.rows.some(r=>r.id===S.c.cell))S.c.cell=col.rows[n-1].id}
+ fit(col.rows,'h',clearH(c,col))}
+function addItems(fr,txt){const names=String(txt).split(/[;\n]/).map(s=>s.trim()).filter(Boolean);if(!names.length)return 0;hist();
+ const last=fr.row.items[fr.row.items.length-1];for(const n of names)fr.row.items.push(mkIt(n,'',last?last.col:0));return names.length}
+function addCab(v){const [k,i]=v.split(':');if(!PRE[k])return;hist();const c=mkCab(k,+i||0);S.c.list.push(c);S.c.sel=c.id;S.c.cell=c.cols[0].rows[0].id;ui.setTab('cab');ui.render();toast('Új szekrény: '+c.name)}
+function act(a,el){const c=cab();
+ switch(a){
+  case 'undo':undo();return;case 'redo':redo();return;
+  case 'pick':S.c.sel=el.dataset.id;S.c.cell='';refresh();if(ui.tab==='sheet')R.sheet.calc();return;
+  case 'png':exportPNG();return;case 'svg':exportSVG();return;case 'pdf':exportPDF();return;case 'json':exportJSON();return;case 'csv':exportCSV();return;
+  case 'open':$('#pr_file').click();return;
+  case 'new':if(!confirm('Új, üres projektet kezdesz? Minden szekrény törlődik. (Ctrl+Z visszavonja)'))return;hist();S.c.list=[];S.c.sel='';S.c.cell='';ui.save();ui.render();return;
+  case 'demo':hist();S.c.list=demo();S.c.sel=S.c.list[0].id;S.c.cell='';ui.save();ui.render();toast('Minta betöltve (Ctrl+Z visszavonja)');return;
+  case 'goto':{const fr=findRow(el.dataset.row);if(!fr)return;S.c.sel=fr.c.id;S.c.cell=fr.row.id;ui.setTab('cab');ui.save();ui.render();window.scrollTo({top:0});return}}
+ if(!c)return;
+ switch(a){
+  case 'ctype':hist();c.type=el.dataset.v;refresh();return;
+  case 'cdup':{hist();const d=JSON.parse(JSON.stringify(c));d.id=uid();d.name=c.name+' (másolat)';d.cols.forEach(col=>{col.id=uid();col.rows.forEach(r=>{r.id=uid();r.items.forEach(it=>it.id=uid())})});S.c.list.splice(S.c.list.indexOf(c)+1,0,d);S.c.sel=d.id;S.c.cell='';refresh();toast('Másolat elkészült');return}
+  case 'cdel':if(!confirm(`Törlöd: „${c.name}”? (Ctrl+Z visszavonja)`))return;hist();S.c.list.splice(S.c.list.indexOf(c),1);S.c.sel=S.c.list[0]?S.c.list[0].id:'';S.c.cell='';refresh();return}
+ const fr=S.c.cell?findRow(S.c.cell):null;if(!fr)return;const {col,row}=fr;
+ switch(a){
+  case 'clock':hist();col.lock=col.lock?0:1;break;
+  case 'rlock':hist();row.lock=row.lock?0:1;break;
+  case 'ceven':hist();evenOut(col.rows,'h',clearH(c,col));toast('Polcközök egyenletesen elosztva');break;
+  case 'rkind':hist();row.kind=el.dataset.v;break;
+  case 'rsplit':{hist();const h=(row.h-c.t)/2;if(h<MINR){toast('Ez a rekesz túl alacsony a kettéosztáshoz');return}const nr=mkRow(r1(h),row.kind);row.h=r1(row.h-c.t-nr.h);row.lock=0;col.rows.splice(fr.ri+1,0,nr);fit(col.rows,'h',clearH(c,col));break}
+  case 'rmerge':{if(col.rows.length<2)return;hist();const i=fr.ri<col.rows.length-1?fr.ri+1:fr.ri-1,o=col.rows[i];row.h=r1(row.h+c.t+o.h);row.items.push(...o.items);col.rows.splice(i,1);fit(col.rows,'h',clearH(c,col));break}
+  case 'iadd':{const inp=$('#pr_new');const n=addItems(fr,inp?inp.value:'');if(!n){inp&&inp.focus();return}refresh();const ni=$('#pr_new');if(ni)ni.focus();return}
+  case 'idel':{const i=row.items.findIndex(x=>x.id===el.dataset.id);if(i<0)return;hist();row.items.splice(i,1);break}
+  case 'iup':{const i=row.items.findIndex(x=>x.id===el.dataset.id);if(i<1)return;hist();[row.items[i-1],row.items[i]]=[row.items[i],row.items[i-1]];break}
+  case 'icol':{const it=row.items.find(x=>x.id===el.dataset.id);if(!it)return;hist();it.col=(it.col+1)%ICOL.length;break}
+  default:return}
+ refresh()}
+document.addEventListener('change',e=>{const t=e.target;if(!t.closest)return;
+ if(t.id==='pr_file'){const fl=t.files[0];if(!fl)return;const rd=new FileReader();
+  rd.onload=()=>{const d=parse(rd.result);if(!d||d.app!=='polcrendezo'||!Array.isArray(d.list)){toast('Ez nem Polcrendező fájl');return}
+   hist();S.p={...JSON.parse(JSON.stringify(DEF.p)),...(d.p||{})};S.c.list=sanitize(d.list);S.c.sel=S.c.list[0]?S.c.list[0].id:'';S.c.cell='';ui.save();ui.render();toast('Betöltve: '+fl.name)};rd.readAsText(fl);t.value='';return}
+ if(t.id==='pr_add'){const v=t.value;t.value='';if(v)addCab(v);return}
+ const c=cab();if(!c)return;
+ if(t.id==='pr_pre'){const p=PRE[c.type][+t.value];t.value='';if(!p)return;hist();const q=p[1];Object.assign(c,{W:q.W,H:q.H,D:q.D,pl:q.pl||0,top:q.top||0,fal:q.fal?1:0});fitCab(c);refresh();toast('Méretek: '+p[0]);return}
+ if(t.dataset.cfal!==undefined){hist();c.fal=t.checked?1:0;refresh();return}
+ const v=num(t.value);
+ if(t.dataset.cf){const k=t.dataset.cf;if(!ok(v)||(k!=='pl'&&k!=='top'&&v<=0)||v<0){toast('Érvénytelen érték');later(renderPanel);return}hist();c[k]=k==='t'?clamp(v,.3,10):v;fitCab(c);later(refresh);return}
+ if(t.dataset.cnc!==undefined){if(!ok(v)){later(renderPanel);return}hist();setCols(c,v);later(refresh);return}
+ const fr=S.c.cell?findRow(S.c.cell):null;if(!fr)return;
+ if(t.dataset.coln!==undefined){if(!ok(v)||v<0){later(renderPanel);return}hist();setRows(c,fr.col,v+1);later(refresh);return}
+ if(t.dataset.colw!==undefined){if(!ok(v)||v<MINR){toast('Érvénytelen szélesség');later(renderPanel);return}hist();fr.col.w=v;fit(c.cols,'w',clearW(c),fr.ci);later(refresh);return}
+ if(t.dataset.rowh!==undefined){if(!ok(v)||v<MINR){toast('Érvénytelen magasság');later(renderPanel);return}hist();fr.row.h=v;fit(fr.col.rows,'h',clearH(c,fr.col),fr.ri);later(refresh);return}
+ if(t.dataset.imv){const to=t.value;if(to)moveItem(t.dataset.imv,to);return}});
+document.addEventListener('keydown',e=>{const tg=e.target,inF=/INPUT|SELECT|TEXTAREA/.test(tg.tagName),mod=e.ctrlKey||e.metaKey,k=e.key.toLowerCase();
+ if(tg.id==='pr_new'&&e.key==='Enter'){e.preventDefault();act('iadd',tg);return}
+ if(mod&&!inF&&k==='z'){e.preventDefault();e.shiftKey?redo():undo();return}
+ if(mod&&!inF&&k==='y'){e.preventDefault();redo();return}
+ if(!inF&&ui.tab==='cab'&&S.c.cell&&(k==='arrowup'||k==='arrowdown'||k==='arrowleft'||k==='arrowright')){const fr=findRow(S.c.cell);if(!fr||fr.c.id!==(cab()||{}).id)return;e.preventDefault();
+  let ci=fr.ci,ri=fr.ri;if(k==='arrowup')ri--;else if(k==='arrowdown')ri++;else if(k==='arrowleft')ci--;else ci++;
+  ci=clamp(ci,0,fr.c.cols.length-1);const rows=fr.c.cols[ci].rows;ri=clamp(ri,0,rows.length-1);selectCell(rows[ri].id)}});
+document.addEventListener('focusin',e=>{if(e.target.closest('main')&&/INPUT|SELECT|TEXTAREA/.test(e.target.tagName))hist()});
+let rsT=0;addEventListener('resize',()=>{clearTimeout(rsT);rsT=setTimeout(()=>{if(ui.tab==='cab')drawEditor()},150)});
+
+/* ---------- export ---------- */
+const fileBase=()=>safeName(S.p.proj||'polcrendezo');
+function sheetsFor(all){const c=cab();return all?S.c.list:(c?[c]:[])}
+async function exportPNG(){const c=cab();if(!c){toast('Nincs szekrény');return}
+ try{const img=new Image();img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(sheetSVG(c));await img.decode();
+ const k=2,cv=document.createElement('canvas');cv.width=SW*k;cv.height=SH*k;const g=cv.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,cv.width,cv.height);g.drawImage(img,0,0,cv.width,cv.height);
+ const blob=await new Promise(r=>cv.toBlob(r,'image/png'));await download(fileBase()+'_'+safeName(c.name)+'.png',blob,'image/png')}catch(e){toast('A PNG export nem sikerült: '+e.message)}}
+function exportSVG(){const c=cab();if(!c){toast('Nincs szekrény');return}download(fileBase()+'_'+safeName(c.name)+'.svg',sheetSVG(c),'image/svg+xml')}
+function exportPDF(){const list=sheetsFor(!!S.p.pdfAll);if(!list.length){toast('Nincs szekrény');return}
+ let el=$('#rep');if(!el){el=document.createElement('div');el.id='rep';document.body.appendChild(el)}
+ el.innerHTML=list.map(c=>`<div class="pg">${sheetSVG(c)}</div>`).join('');document.body.classList.add('rep-on');const t=document.title;document.title=fileBase();
+ const done=()=>{document.body.classList.remove('rep-on');document.title=t;window.removeEventListener('afterprint',done)};window.addEventListener('afterprint',done);
+ toast('A nyomtatási ablakban válaszd: Mentés PDF-ként');setTimeout(()=>window.print(),80)}
+function exportJSON(){download(fileBase()+'.json',JSON.stringify({app:'polcrendezo',v:1,p:S.p,list:S.c.list},null,1),'application/json')}
+function exportCSV(){const rows=[['Szekrény','Típus','Rekesz','Fajta','Belméret (sz × m, cm)','Tárgy','Mennyiség']];
+ for(const c of S.c.list)c.cols.forEach((col,ci)=>col.rows.forEach((r,ri)=>{const base=[c.name,TYP[c.type].n,code(c,ci,ri),r.kind==='drawer'?'fiók':'polc',`${L1(col.w)} × ${L1(r.h)}`];
+  if(!r.items.length)rows.push([...base,'','']);else r.items.forEach(it=>rows.push([...base,it.n,it.q]))}));
+ download(fileBase()+'_leltar.csv','﻿'+rows.map(r=>r.map(csvQ).join(';')).join('\r\n'),'text/csv')}
+
+/* ---------- nézetek ---------- */
+const ck=(k,l)=>`<label class="ck"><input type="checkbox" data-ck="${k}" ${S.p[k]?'checked':''}>${l}</label>`;
+const txt=(k,l,ph='')=>`<div class="f"><label for="i_p_${k}">${l}</label><div class="iw"><input id="i_p_${k}" data-t="p" data-k="${k}" autocomplete="off" value="${esc(S.p[k]??'')}" placeholder="${esc(ph)}"></div></div>`;
+let Q='';
+const R={};
+R.cab={title:'Szekrények',desc:'Válassz szekrényt, add meg a méreteit és a polcokat, majd a rekeszekbe írd be, mi kerül oda. A polcközök a magasság változásakor arányosan igazodnak.',
+ html(){return `<div class="prg"><div class="card"><div class="ctabs" id="pr_tabs"></div>
+  <div class="row tb"><button class="btn sm" data-act="undo" title="Visszavonás (Ctrl+Z)">${ic('undo')}</button><button class="btn sm" data-act="redo" title="Újra (Ctrl+Y)">${ic('redo')}</button><label class="ck sm"><input type="checkbox" data-ck="hs" ${S.p.hs?'checked':''}>Polcközök a rajzon</label><span class="grow"></span><span id="pr_pill" class="pill na"></span></div>
+  <div class="cv" id="pr_cv"></div><div class="res" id="pr_stats"></div></div>
+  <div class="kcol" id="pr_props"></div></div>`},
+ calc(){renderTabs();drawEditor();renderPanel()}};
+R.items={title:'Tárgyak és keresés',desc:'Az összes szekrény tartalma egy listában. Írd be, mit keresel, és megmutatja, melyik szekrény melyik rekeszében van.',
+ html(){return `<div class="card"><div class="iw srch">${ic('search',18)}<input id="pr_q" placeholder="Keresés: pl. törölköző" value="${esc(Q)}" autocomplete="off"></div><div id="pr_res"></div></div>`},
+ calc(){const el=$('#pr_res');if(!el)return;const q=norm(Q).trim();const all=allItems();const hit=q?all.filter(x=>norm(x.it.n+' '+x.c.name).includes(q)):all;
+  if(!all.length){el.innerHTML='<p class="hint">Még nincs egy tárgy sem. A Szekrények fülön egy rekeszre koppintva adhatsz hozzá.</p>';return}
+  el.innerHTML=`<p class="hint">${q?`${hit.length} találat`:`${all.length} tárgy, ${S.c.list.length} szekrényben`}</p>`+(hit.length?`<div class="tw"><table class="t"><thead><tr><th>Tárgy</th><th>Db</th><th>Szekrény</th><th>Rekesz</th><th></th></tr></thead><tbody>${hit.map(x=>`<tr><td><i class="sw" style="background:${ICOL[x.it.col]}"></i> ${esc(x.it.n||'(névtelen)')}</td><td>${esc(x.it.q)}</td><td>${esc(x.c.name)}</td><td><b>${esc(code(x.c,x.ci,x.ri))}</b>${x.row.kind==='drawer'?' <span class="pill na">fiók</span>':''}</td><td class="n"><button class="btn sm" data-act="goto" data-row="${x.row.id}">${ic('go',14)}Mutasd</button></td></tr>`).join('')}</tbody></table></div>`:'')}};
+R.sheet={title:'Tervlap és export',desc:'Szekrényenként egy A4 fekvő tervlap: elölnézet méretekkel, rekeszkódokkal és tartalommal, mellette a rekeszek listája. PNG, SVG, PDF és CSV leltár.',
+ html(){return `<div class="card"><div class="ctabs" id="pr_tabs"></div><div class="row"><button class="btn pri" data-act="png">${ic('img')}PNG kép</button><button class="btn" data-act="pdf">${ic('doc')}PDF (A4 fekvő)</button><button class="btn" data-act="svg">${ic('dl')}SVG</button><button class="btn" data-act="csv">${ic('dl')}Leltár CSV</button><button class="btn" data-act="json">${ic('dl')}Mentés JSON-ba</button><button class="btn" data-act="open">${ic('up')}Megnyitás</button></div>
+  <div class="sheetw" id="pr_sheet"></div></div>
+  <div class="grid"><div class="card"><h2>Fejléc</h2><div class="fields">${txt('title','Cím')}${txt('proj','Projekt','pl. Lakás – konyha és fürdő')}${txt('author','Készítette')}${txt('date','Dátum','pl. 2026.11.12.')}</div></div>
+  <div class="card"><h2>Beállítások</h2><div class="cks">${ck('pdfAll','PDF: az összes szekrény (szekrényenként egy oldal)')}${ck('tbl','Rekesz-táblázat a tervlapon')}${ck('hs','Polcközök a rajzon')}</div>
+  <p class="hint">A PNG és az SVG a kiválasztott szekrény lapja. A PDF-hez a nyomtatási ablakban a „Mentés PDF-ként” célt válaszd.</p></div></div>`},
+ calc(){renderTabs();const el=$('#pr_sheet'),c=cab();if(el)el.innerHTML=c?sheetSVG(c):'<p class="hint" style="padding:16px">Nincs szekrény.</p>'}};
+const ui=shell({prefix:'pr',tabs:[['cab','Szekrények','Szekrény','cab'],['items','Tárgyak és keresés','Tárgyak','list'],['sheet','Tervlap és export','Tervlap','sheet']],R,
+ note:'A méretek centiméterben. A terv a böngészőben tárolódik, JSON-ba menthető.',
+ onClick:(a,el)=>act(a,el),
+ onInput(t){const c=cab();
+  if(t.id==='pr_q'){Q=t.value;R.items.calc();return}
+  if(t.dataset.ck){S.p[t.dataset.ck]=t.checked?'1':'';ui.save();if(ui.tab==='cab'){drawEditor();renderPanel()}else ui.recalc();return}
+  if(t.dataset.cname!==undefined&&c){c.name=t.value;ui.save();renderTabs();return}
+  if(t.dataset.in){const fi=findItem(t.dataset.in);if(fi){fi.it.n=t.value;ui.save();drawEditor()}return}
+  if(t.dataset.iq){const fi=findItem(t.dataset.iq);if(fi){fi.it.q=t.value;ui.save();drawEditor()}return}},
+ menu:()=>`<div class="mh">Polcrendező</div><button class="mi" data-m="png">${ic('img')}Tervlap PNG képként</button><button class="mi" data-m="pdf">${ic('doc')}Tervlap PDF-be (A4)</button><button class="mi" data-m="svg">${ic('dl')}Tervlap SVG-be</button><button class="mi" data-m="csv">${ic('dl')}Leltár CSV-be</button><button class="mi" data-m="json">${ic('dl')}Mentés JSON-ba</button><button class="mi" data-m="open">${ic('up')}Megnyitás JSON-ból</button><button class="mi" data-m="demo">${ic('cab')}Minta betöltése</button><button class="mi" data-m="new">${ic('trash')}Új, üres projekt</button>`,
+ onMenu(m){act(m,{dataset:{}})}});
+document.body.insertAdjacentHTML('beforeend','<input type="file" id="pr_file" accept=".json,application/json" hidden>');
+if(!cab()&&S.c.list[0])S.c.sel=S.c.list[0].id;
+ui.render();
