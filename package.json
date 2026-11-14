@@ -1,0 +1,16 @@
+{
+  "name": "butortervezo",
+  "private": true,
+  "description": "Egyfájlos bútortervező HTML appok – build, ellenőrzés és tesztek",
+  "scripts": {
+    "build": "cd src && python3 b_kp.py && python3 b_pr.py && python3 b_index.py",
+    "check": "node tests/check.mjs",
+    "test": "node tests/check.mjs && playwright test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.1"
+  }
+}

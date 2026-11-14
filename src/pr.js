@@ -112,12 +112,40 @@ function demo(){
  a.W=120;fitCab(a);
  const G={id:uid(),name:'Konyha'};for(const x of [b,k,a])x.g=G.id;
  S.c.groups=[G];return [b,k,a,d,e]}
-function sanitize(list){return (Array.isArray(list)?list:[]).filter(c=>c&&Array.isArray(c.cols)).map(c=>{
- const o={id:c.id||uid(),name:String(c.name||'Szekrény'),type:TYP[c.type]?c.type:'allo',W:Math.max(5,+c.W||60),H:Math.max(5,+c.H||60),D:Math.max(1,+c.D||30),t:clamp(+c.t||1.8,.3,10),pl:Math.max(0,+c.pl||0),top:Math.max(0,+c.top||0),fal:c.fal?1:0,elev:Math.max(0,+c.elev||0),g:String(c.g||''),gap:Math.max(0,+c.gap||0),
-  cols:c.cols.filter(x=>x&&Array.isArray(x.rows)&&x.rows.length).map(x=>({id:x.id||uid(),w:+x.w||10,lock:x.lock?1:0,rows:x.rows.map(r=>({id:r.id||uid(),h:+r.h||10,lock:r.lock?1:0,kind:r.kind==='drawer'?'drawer':'shelf',items:(Array.isArray(r.items)?r.items:[]).map(it=>({id:it.id||uid(),n:String(it.n||''),q:String(it.q??''),col:clamp(+it.col||0,0,ICOL.length-1)}))}))}))};
- if(!o.cols.length)o.cols=[{id:uid(),w:10,lock:0,rows:[mkRow(10)]}];return o})}
-const sanG=a=>(Array.isArray(a)?a:[]).filter(x=>x&&x.id).map(x=>({id:String(x.id),name:String(x.name||'Sor')}));
-if(Array.isArray(S.c.list)){S.c.list=sanitize(S.c.list);S.c.groups=sanG(S.c.groups)}else{S.c.groups=[];S.c.list=demo()}
+/* ---------- adatellenőrzés (import és tárolt állapot) ----------
+   Az azonosítók mindig újak; a sor-hivatkozások és a kijelölés átíródnak. Hibánál ImportErr, a terv nem változik. */
+const PR_LIM={cabs:200,groups:50,cols:8,rows:40,items:200,itemsTotal:5000};
+const PR_STR={title:120,proj:120,author:120,date:40};
+function validatePr(d){
+ const dp=isObj(d.p)?d.p:{},p={};
+ for(const k in DEF.p)p[k]=PR_STR[k]?(typeof dp[k]==='string'||typeof dp[k]==='number'?vStr(dp[k],PR_STR[k]):DEF.p[k]):(dp[k]===undefined?DEF.p[k]:vFlag(dp[k]));
+ const idMap={},gMap={};
+ const groups=(d.groups==null?[]:vArr(d.groups,PR_LIM.groups,'szekrénysorok')).map((G,i)=>{vObj(G,`${i+1}. szekrénysor`);const id=uid();if(typeof G.id==='string')gMap[G.id]=id;return {id,name:vStr(G.name,60)||'Sor'}});
+ let tot=0;
+ const list=vArr(d.list,PR_LIM.cabs,'szekrények').map((c,ci)=>{vObj(c,`${ci+1}. szekrény`);const n=`„${vStr(c.name,40)||ci+1+'. szekrény'}”`;
+  const o={id:uid(),name:vStr(c.name,80)||'Szekrény',type:vOne(c.type,Object.keys(TYP),'allo'),
+   W:vNum(c.W,5,2000,n+' szélesség'),H:vNum(c.H,5,1000,n+' magasság'),D:vNum(c.D,1,500,n+' mélység'),
+   t:vNumOpt(c.t,.3,10,1.8),pl:vNumOpt(c.pl,0,200,0),top:vNumOpt(c.top,0,50,0),fal:c.fal?1:0,
+   g:typeof c.g==='string'&&gMap[c.g]?gMap[c.g]:'',gap:vNumOpt(c.gap,0,1000,0),elev:0,cols:[]};
+  o.elev=vNumOpt(c.elev,0,500,o.fal?150:0);
+  if(typeof c.id==='string')idMap[c.id]=o.id;
+  if(o.H<=o.pl+o.top+2*o.t+MINR)impFail(`${n}: a magasság túl kicsi a lábazathoz, munkalaphoz és lapvastagsághoz.`);
+  const cols=vArr(c.cols,PR_LIM.cols,n+' oszlopai',1);
+  if(o.W<=2*o.t+(cols.length-1)*o.t+cols.length*MINR)impFail(`${n}: a szélesség túl kicsi ennyi oszlophoz.`);
+  o.cols=cols.map((col,k)=>{vObj(col,`${n} ${k+1}. oszlopa`);const cid=uid();if(typeof col.id==='string')idMap[col.id]=cid;
+   const rows=vArr(col.rows,PR_LIM.rows,`${n} ${k+1}. oszlopának rekeszei`,1);
+   return {id:cid,w:vNumOpt(col.w,.1,2000,10),lock:col.lock?1:0,rows:rows.map((r,ri)=>{vObj(r,`${n} rekesze`);const rid=uid();if(typeof r.id==='string')idMap[r.id]=rid;
+    const its=r.items==null?[]:vArr(r.items,PR_LIM.items,`${n} egy rekeszének tárgyai`);tot+=its.length;if(tot>PR_LIM.itemsTotal)impFail(`Túl sok tárgy (legfeljebb ${PR_LIM.itemsTotal}).`);
+    return {id:rid,h:vNumOpt(r.h,.1,1000,10),lock:r.lock?1:0,kind:r.kind==='drawer'?'drawer':'shelf',
+     items:its.filter(isObj).map(it=>({id:uid(),n:vStr(it.n,120),q:vStr(it.q,20),col:Math.round(vNumOpt(it.col,0,ICOL.length-1,0))}))}})}});
+  if(o.cols.reduce((s,col)=>Math.max(s,col.rows.length),0)*MINR+(o.cols.reduce((s,col)=>Math.max(s,col.rows.length),0)+1)*o.t>o.H-o.pl-o.top)impFail(`${n}: a magasság túl kicsi ennyi polchoz.`);
+  fitCab(o);return o});
+ const used=new Set(list.map(c=>c.g));
+ return {p,list,groups:groups.filter(G=>used.has(G.id)),idMap}}
+{let v=null;if(Array.isArray(S.c.list)){try{v=validatePr({p:S.p,list:S.c.list,groups:S.c.groups})}catch(e){v=null;setTimeout(()=>toast('A tárolt terv hibás volt, a minta töltődött be.'),400)}}
+ if(v){S.p=v.p;S.c.list=v.list;S.c.groups=v.groups;S.c.sel=v.idMap[S.c.sel]||'';S.c.cell=v.idMap[S.c.cell]||''}
+ else{S.p=validatePr({p:S.p,list:[]}).p;S.c.groups=[];S.c.list=demo()}
+ S.c.view=vOne(S.c.view,['row','single'],'row')}
 cleanGroups();
 
 /* ---------- visszavonás ---------- */
@@ -404,9 +432,8 @@ function act(a,el){const c=cab();
   default:return}
  refresh()}
 document.addEventListener('change',e=>{const t=e.target;if(!t.closest)return;
- if(t.id==='pr_file'){const fl=t.files[0];if(!fl)return;const rd=new FileReader();
-  rd.onload=()=>{const d=parse(rd.result);if(!d||d.app!=='polcrendezo'||!Array.isArray(d.list)){toast('Ez nem Polcrendező fájl');return}
-   hist();S.p={...JSON.parse(JSON.stringify(DEF.p)),...(d.p||{})};S.c.list=sanitize(d.list);S.c.groups=sanG(d.groups);cleanGroups();S.c.sel=S.c.list[0]?S.c.list[0].id:'';S.c.cell='';ui.save();ui.render();toast('Betöltve: '+fl.name)};rd.readAsText(fl);t.value='';return}
+ if(t.id==='pr_file'){const fl=t.files[0];if(!fl)return;
+  t.value='';readImport(fl,'polcrendezo','Polcrendező',validatePr).then(v=>{hist();S.p=v.p;S.c.list=v.list;S.c.groups=v.groups;S.c.sel=S.c.list[0]?S.c.list[0].id:'';S.c.cell='';ui.save();ui.render();toast('Betöltve: '+fl.name)},err=>toast('Nem sikerült betölteni: '+err.message));return}
  if(t.id==='pr_add'){const v=t.value;t.value='';if(v)addCab(v);return}
  const c=cab();if(!c)return;
  if(t.id==='pr_pre'){const p=PRE[c.type][+t.value];t.value='';if(!p)return;hist();const q=p[1];Object.assign(c,{W:q.W,H:q.H,D:q.D,pl:q.pl||0,top:q.top||0,fal:q.fal?1:0,elev:q.elev??(q.fal?150:0)});fitCab(c);refresh();toast('Méretek: '+p[0]);return}
@@ -493,3 +520,5 @@ document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.closest&&e.
 document.body.insertAdjacentHTML('beforeend','<input type="file" id="pr_file" accept=".json,application/json" hidden>');
 if(!cab()&&S.c.list[0])S.c.sel=S.c.list[0].id;
 ui.render();
+/* tesztelési felület (tests/*.spec.mjs) */
+window.__bt=Object.freeze({get S(){return S},validatePr,fit,fitCab,rowLayout,mkCab,PRE,setRows,setCols,exportJSON,exportCSV,exportPDF,fileBase,undo,redo,act,code,clearH,clearW,rowMake,safeName});

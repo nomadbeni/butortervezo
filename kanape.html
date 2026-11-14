@@ -237,7 +237,7 @@ nav.bot{display:none}
 'use strict';
 /* ===== közös alap (app keret, mezők, téma, menü) ===== */
 const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)];
-const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
 const parse=s=>{try{return JSON.parse(s)}catch(e){return null}};
 const num=v=>{if(v==null)return NaN;if(typeof v==='number')return v;const s=String(v).replace(/\s/g,'').replace(',','.');return s===''?NaN:+s};
@@ -288,6 +288,36 @@ function shell(cfg){
  $('#menu').addEventListener('click',e=>{if(e.target.id==='menu'){$('#menu').classList.remove('on');return}const m=e.target.closest('[data-m]');if(!m)return;$('#menu').classList.remove('on');cfg.onMenu&&cfg.onMenu(m.dataset.m,m)});
  return {render,recalc,save,get tab(){return tab},setTab(t){tab=t;store.set(cfg.prefix+'.tab',t)}}}
 function loadState(prefix,DEF){const s=parse(store.get(prefix+'.state'))||{};const o={};for(const k in DEF)o[k]={...JSON.parse(JSON.stringify(DEF[k])),...(s[k]||{})};return o}
+
+/* ===== import-ellenőrzés (közös) =====
+   Szabályok: a fájl legfeljebb 2 MB, érvényes JSON objektum, a megfelelő "app" mezővel.
+   Kötelező méretek (nem véges vagy tartományon kívüli szám) és a darabszám-korlátok átlépése -> elutasítás, érthető üzenettel.
+   Opcionális mezők (szövegek, kapcsolók, választók) hibás típus esetén alapértékre állnak, a szövegek hossza korlátozott.
+   Az importált azonosítókat az app nem használja: minden elem új, belső azonosítót kap. */
+const IMP_MAX_BYTES=2*1024*1024;
+class ImportErr extends Error{constructor(m){super(m);this.name='ImportErr'}}
+const impFail=m=>{throw new ImportErr(m)};
+const isObj=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
+const vStr=(v,max=200,def='')=>(typeof v==='string'?v:(typeof v==='number'&&Number.isFinite(v)?String(v):def)).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g,'').slice(0,max);
+const vNumRaw=v=>typeof v==='number'?v:(typeof v==='string'&&v.trim()!==''&&v.length<40?num(v):NaN);
+const vNum=(v,lo,hi,what)=>{const n=vNumRaw(v);if(!Number.isFinite(n)||n<lo||n>hi)impFail(`Érvénytelen érték: ${what} (${lo} és ${hi} közötti szám kell)`);return n};
+const vNumOpt=(v,lo,hi,def)=>{const n=vNumRaw(v);return Number.isFinite(n)?Math.min(hi,Math.max(lo,n)):def};
+const vArr=(v,max,what,min=0)=>{if(!Array.isArray(v))impFail(`Hiányzó vagy hibás lista: ${what}`);if(v.length>max)impFail(`Túl sok elem: ${what} (legfeljebb ${max})`);if(v.length<min)impFail(`Üres lista: ${what}`);return v};
+const vObj=(v,what)=>{if(!isObj(v))impFail(`Hibás adat: ${what}`);return v};
+const vOne=(v,list,def)=>list.includes(v)?v:def;
+const vFlag=v=>v===true||v===1||v==='1'?'1':'';
+const SAFE_ID=/^[a-z0-9]{1,16}$/;
+function parseImport(text,app,appName){if(typeof text!=='string')impFail('A fájl nem szöveges.');
+ if(text.length>IMP_MAX_BYTES)impFail('A fájl túl nagy (legfeljebb 2 MB lehet).');
+ let d;try{d=JSON.parse(text)}catch(e){impFail('A fájl nem érvényes JSON.')}
+ if(!isObj(d))impFail('A fájl nem tervfájl.');if(d.app!==app)impFail(`Ez nem ${appName} fájl.`);return d}
+/* fájl beolvasása + ellenőrzése; a validate függvény a kész, ellenőrzött adatot adja vissza vagy ImportErr-t dob */
+function readImport(file,app,appName,validate){return new Promise((res,rej)=>{
+ if(!file)return rej(new ImportErr('Nincs fájl kiválasztva.'));
+ if(file.size>IMP_MAX_BYTES)return rej(new ImportErr(`A fájl túl nagy (${(file.size/1048576).toFixed(1)} MB, legfeljebb 2 MB lehet).`));
+ const rd=new FileReader();rd.onerror=()=>rej(new ImportErr('A fájl nem olvasható.'));
+ rd.onload=()=>{try{res(validate(parseImport(rd.result,app,appName)))}catch(e){rej(e instanceof ImportErr?e:new ImportErr('Hibás tervfájl.'))}};
+ rd.readAsText(file)})}
 
 /* ================= Kanapé-tervező ================= */
 Object.assign(IC,{
@@ -342,9 +372,31 @@ const DEF={
   lgSeat:'Ülőfelület / bútor test',lgTrim:'Bőr könyöklő / díszperem',lgBack:'Háttámla',lgPil:'Párna / fekvőrész',extra:[]},
  b:{items:null,sel:''}
 };
+/* ---------- adatellenőrzés (import és tárolt állapot) ---------- */
+const KP_LIM={items:300,tab:20,extra:30,coord:20000,size:10000};
+const KP_STR={title:120,proj:120,client:120,author:120,date:40,lTotW:120,lTotH:120,lgSeat:120,lgTrim:120,lgBack:120,lgPil:120};
+const KP_NUM={H:[0,300],leg:[0,100],cush:[0,100],D:[0,500],bH:[0,200],bD:[0,300]};
+const KP_DIM=['off','tot','chain','edge'],KP_FLAG=['totW','totH','seams','lbl','trimSum','area'];
+function validateKp(d){
+ const dp=isObj(d.p)?d.p:{},p={};
+ for(const k in DEF.p){const v=dp[k],dv=DEF.p[k];
+  if(k==='extra')p.extra=(Array.isArray(v)?v:[]).slice(0,KP_LIM.extra).filter(isObj).map(x=>({l:vStr(x.l,120),v:vStr(x.v,120)}));
+  else if(KP_STR[k])p[k]=typeof v==='string'||typeof v==='number'?vStr(v,KP_STR[k]):dv;
+  else if(KP_NUM[k]){const n=vNumOpt(v,KP_NUM[k][0],KP_NUM[k][1],NaN);p[k]=ok(n)?String(n):dv}
+  else if(k==='snap')p[k]=vOne(String(v),['1','5','10'],dv);
+  else if(/^d[TBLR]$/.test(k))p[k]=vOne(v,KP_DIM,dv);
+  else if(KP_FLAG.includes(k))p[k]=v===undefined?dv:vFlag(v);
+  else p[k]=dv}
+ const db=vObj(d.b,'elemek'),idMap={};
+ const items=vArr(db.items,KP_LIM.items,'elemek').map((b,i)=>{const n=`${i+1}. elem`;vObj(b,n);const id=uid();if(typeof b.id==='string')idMap[b.id]=id;
+  return {id,name:vStr(b.name,80)||'Elem',type:vOne(b.type,Object.keys(TY),'seat'),
+   x:vNum(b.x,-KP_LIM.coord,KP_LIM.coord,n+' x'),y:vNum(b.y,-KP_LIM.coord,KP_LIM.coord,n+' y'),
+   w:vNum(b.w,.1,KP_LIM.size,n+' szélesség'),h:vNum(b.h,.1,KP_LIM.size,n+' mélység'),dw:b.dw?1:0,dh:b.dh?1:0,
+   tab:(Array.isArray(b.tab)?b.tab:[]).slice(0,KP_LIM.tab).filter(isObj).map(r=>({f:vOne(r.f,['w','h','wh'],'w'),l:vStr(r.l,120)}))}});
+ return {p,b:{items,sel:''},idMap}}
 S=loadState('kp',DEF);
-if(!Array.isArray(S.b.items))S.b.items=TPL.kep.items();
-if(!Array.isArray(S.p.extra))S.p.extra=[];
+{let v=null;if(Array.isArray(S.b.items)){try{v=validateKp({p:S.p,b:S.b})}catch(e){v=null;setTimeout(()=>toast('A tárolt terv hibás volt, a minta töltődött be.'),400)}}
+ if(v){const sel=v.idMap[S.b.sel]||'';S.p=v.p;S.b=v.b;S.b.sel=sel}else{S.p=validateKp({p:S.p,b:{items:[]}}).p;S.b={items:TPL.kep.items(),sel:''}}}
 
 /* ---------- segédek ---------- */
 const f=v=>Math.round(v*100)/100;
@@ -632,11 +684,10 @@ function exportPDF(){let el=$('#rep');if(!el){el=document.createElement('div');e
  const done=()=>{document.body.classList.remove('rep-on');document.title=t;window.removeEventListener('afterprint',done)};window.addEventListener('afterprint',done);
  toast('A nyomtatási ablakban válaszd: Mentés PDF-ként');setTimeout(()=>window.print(),80)}
 function exportJSON(){download(fileBase()+'.json',JSON.stringify({app:'kanape',v:1,p:S.p,b:{items:S.b.items}},null,1),'application/json')}
-document.addEventListener('change',e=>{if(e.target.id!=='kp_file')return;const fl=e.target.files[0];if(!fl)return;const rd=new FileReader();
- rd.onload=()=>{const d=parse(rd.result);if(!d||d.app!=='kanape'||!d.b||!Array.isArray(d.b.items)){toast('Ez nem Kanapé-tervező fájl');return}
-  hist();S.p={...JSON.parse(JSON.stringify(DEF.p)),...d.p};if(!Array.isArray(S.p.extra))S.p.extra=[];
-  S.b={items:d.b.items.map(b=>({id:b.id||uid(),name:String(b.name||'Elem'),type:TY[b.type]?b.type:'seat',x:+b.x||0,y:+b.y||0,w:Math.max(1,+b.w||10),h:Math.max(1,+b.h||10),dw:b.dw?1:0,dh:b.dh?1:0,tab:Array.isArray(b.tab)?b.tab.map(r=>({f:['w','h','wh'].includes(r.f)?r.f:'w',l:String(r.l||'')})):[]})),sel:''};
-  ui.save();ui.render();toast('Betöltve: '+fl.name)};rd.readAsText(fl);e.target.value=''});
+/* import: előbb teljes ellenőrzés, csak hibátlan fájl után változik a terv */
+function applyImport(v,name){hist();S.p=v.p;S.b=v.b;ui.save();ui.render();toast('Betöltve: '+name)}
+document.addEventListener('change',e=>{if(e.target.id!=='kp_file')return;const fl=e.target.files[0];e.target.value='';if(!fl)return;
+ readImport(fl,'kanape','Kanapé-tervező',validateKp).then(v=>applyImport(v,fl.name),err=>toast('Nem sikerült betölteni: '+err.message))});
 document.addEventListener('focusin',e=>{if(e.target.closest('main')&&/INPUT|SELECT|TEXTAREA/.test(e.target.tagName))hist()});
 document.addEventListener('click',e=>{if(e.target.closest('[data-seg][data-t]'))hist()},true);
 document.addEventListener('keydown',e=>{const tg=e.target,inF=/INPUT|SELECT|TEXTAREA/.test(tg.tagName),mod=e.ctrlKey||e.metaKey,k=e.key.toLowerCase();
@@ -721,6 +772,8 @@ const ui=shell({prefix:'kp',tabs:[['plan','Felülnézet','Felül','plan'],['side
  onMenu(m){act(m,{dataset:{}})}});
 document.body.insertAdjacentHTML('beforeend','<input type="file" id="kp_file" accept=".json,application/json" hidden>');
 ui.render();
+/* tesztelési felület (tests/*.spec.mjs) */
+window.__bt=Object.freeze({get S(){return S},validateKp,bbox,overlaps,trimLen,seatArea,snapMove,snapE,loadTpl,TPL,exportJSON,fileBase,undo,redo,act,safeName});
 
 })();
 </script>

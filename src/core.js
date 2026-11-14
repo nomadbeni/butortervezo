@@ -1,6 +1,6 @@
 /* ===== közös alap (app keret, mezők, téma, menü) ===== */
 const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)];
-const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
 const parse=s=>{try{return JSON.parse(s)}catch(e){return null}};
 const num=v=>{if(v==null)return NaN;if(typeof v==='number')return v;const s=String(v).replace(/\s/g,'').replace(',','.');return s===''?NaN:+s};
@@ -51,3 +51,33 @@ function shell(cfg){
  $('#menu').addEventListener('click',e=>{if(e.target.id==='menu'){$('#menu').classList.remove('on');return}const m=e.target.closest('[data-m]');if(!m)return;$('#menu').classList.remove('on');cfg.onMenu&&cfg.onMenu(m.dataset.m,m)});
  return {render,recalc,save,get tab(){return tab},setTab(t){tab=t;store.set(cfg.prefix+'.tab',t)}}}
 function loadState(prefix,DEF){const s=parse(store.get(prefix+'.state'))||{};const o={};for(const k in DEF)o[k]={...JSON.parse(JSON.stringify(DEF[k])),...(s[k]||{})};return o}
+
+/* ===== import-ellenőrzés (közös) =====
+   Szabályok: a fájl legfeljebb 2 MB, érvényes JSON objektum, a megfelelő "app" mezővel.
+   Kötelező méretek (nem véges vagy tartományon kívüli szám) és a darabszám-korlátok átlépése -> elutasítás, érthető üzenettel.
+   Opcionális mezők (szövegek, kapcsolók, választók) hibás típus esetén alapértékre állnak, a szövegek hossza korlátozott.
+   Az importált azonosítókat az app nem használja: minden elem új, belső azonosítót kap. */
+const IMP_MAX_BYTES=2*1024*1024;
+class ImportErr extends Error{constructor(m){super(m);this.name='ImportErr'}}
+const impFail=m=>{throw new ImportErr(m)};
+const isObj=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
+const vStr=(v,max=200,def='')=>(typeof v==='string'?v:(typeof v==='number'&&Number.isFinite(v)?String(v):def)).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g,'').slice(0,max);
+const vNumRaw=v=>typeof v==='number'?v:(typeof v==='string'&&v.trim()!==''&&v.length<40?num(v):NaN);
+const vNum=(v,lo,hi,what)=>{const n=vNumRaw(v);if(!Number.isFinite(n)||n<lo||n>hi)impFail(`Érvénytelen érték: ${what} (${lo} és ${hi} közötti szám kell)`);return n};
+const vNumOpt=(v,lo,hi,def)=>{const n=vNumRaw(v);return Number.isFinite(n)?Math.min(hi,Math.max(lo,n)):def};
+const vArr=(v,max,what,min=0)=>{if(!Array.isArray(v))impFail(`Hiányzó vagy hibás lista: ${what}`);if(v.length>max)impFail(`Túl sok elem: ${what} (legfeljebb ${max})`);if(v.length<min)impFail(`Üres lista: ${what}`);return v};
+const vObj=(v,what)=>{if(!isObj(v))impFail(`Hibás adat: ${what}`);return v};
+const vOne=(v,list,def)=>list.includes(v)?v:def;
+const vFlag=v=>v===true||v===1||v==='1'?'1':'';
+const SAFE_ID=/^[a-z0-9]{1,16}$/;
+function parseImport(text,app,appName){if(typeof text!=='string')impFail('A fájl nem szöveges.');
+ if(text.length>IMP_MAX_BYTES)impFail('A fájl túl nagy (legfeljebb 2 MB lehet).');
+ let d;try{d=JSON.parse(text)}catch(e){impFail('A fájl nem érvényes JSON.')}
+ if(!isObj(d))impFail('A fájl nem tervfájl.');if(d.app!==app)impFail(`Ez nem ${appName} fájl.`);return d}
+/* fájl beolvasása + ellenőrzése; a validate függvény a kész, ellenőrzött adatot adja vissza vagy ImportErr-t dob */
+function readImport(file,app,appName,validate){return new Promise((res,rej)=>{
+ if(!file)return rej(new ImportErr('Nincs fájl kiválasztva.'));
+ if(file.size>IMP_MAX_BYTES)return rej(new ImportErr(`A fájl túl nagy (${(file.size/1048576).toFixed(1)} MB, legfeljebb 2 MB lehet).`));
+ const rd=new FileReader();rd.onerror=()=>rej(new ImportErr('A fájl nem olvasható.'));
+ rd.onload=()=>{try{res(validate(parseImport(rd.result,app,appName)))}catch(e){rej(e instanceof ImportErr?e:new ImportErr('Hibás tervfájl.'))}};
+ rd.readAsText(file)})}

@@ -44,3 +44,39 @@ python3 b_index.py     # -> ../index.html (új app: egy sor az APPS listába)
 - `src/b_kp.py`: a kanapé-tervező színei, saját CSS-e, ikonja
 - `src/pr.js`, `src/b_pr.py`: a polcrendező logikája, illetve színei, CSS-e, ikonja
 - `src/b_index.py`: a kezdőlap
+
+A kész HTML-eket is commitolni kell (a CI ellenőrzi, hogy egyeznek a forrással): `npm run build`.
+
+## Tervfájlok importja
+
+A JSON-import (és a böngészőben tárolt terv betöltése) mindkét appban ugyanazokat a szabályokat követi (`src/core.js`, `validateKp`, `validatePr`):
+
+- A fájl legfeljebb **2 MB**, érvényes JSON-objektum, a megfelelő `app` mezővel (`kanape` / `polcrendezo`).
+- **Elutasítás**, érthető hibaüzenettel: hiányzó vagy rossz típusú lista; a darabszám-korlát átlépése; kötelező méret, ami nem véges szám vagy tartományon kívül esik; olyan szekrény, amelybe a megadott polcok fizikailag nem férnek bele.
+- **Normalizálás**: szövegek hossza korlátozva, vezérlőkarakterek nélkül; ismeretlen típus, kapcsoló vagy választó → alapérték; opcionális számok a tartományukba szorítva; ismeretlen mezők elhagyva.
+- Az **azonosítókat az app nem veszi át**: minden elem új, belső azonosítót kap, a sor-hivatkozások és a kijelölés átíródnak.
+- A terv csak a teljes, sikeres ellenőrzés után cserélődik; hibás fájlnál a meglévő terv változatlan marad.
+
+| Korlát | Kanapé-tervező | Polcrendező |
+|---|---|---|
+| Elemek | 300 elem, elemenként 20 táblázatsor | 200 szekrény, 50 sor, 8 oszlop, 40 rekesz/oszlop, 200 tárgy/rekesz, összesen 5000 tárgy |
+| Méretek (cm) | koordináta ±20 000, szélesség/mélység 0,1–10 000 | szélesség 5–2000, magasság 5–1000, mélység 1–500 |
+
+## Tesztek és CI
+
+```bash
+npm ci                 # egyszer: rögzített verziójú függőségek (@playwright/test)
+npx playwright install chromium   # egyszer: böngésző a tesztekhez
+npm test               # statikus ellenőrzés + összes teszt
+```
+
+Ha a Playwright saját Chromiumja nem telepíthető, egy meglévő Chrome is használható: `CHROME_PATH=/usr/bin/google-chrome npm test`.
+
+- `tests/check.mjs` (`npm run check`): a JS források és a kész HTML-ekbe ágyazott szkriptek szintaxisa, a kezdőlap linkjei.
+- `tests/import.spec.mjs`: XSS-regresszió rosszindulatú azonosítókkal és szövegekkel, hibás / túl nagy / rossz típusú fájlok, határértékek, mentés–visszatöltés, sérült tárolt állapot.
+- `tests/kanape.spec.mjs`: befoglaló méret, perem, ülőfelület, átfedés, rácshoz igazítás, sablonok, mozgatás és átméretezés egérrel és billentyűvel, visszavonás/újra, export és fájlnév.
+- `tests/polcrendezo.spec.mjs`: arányos méretezés és lakat, sablonok geometriája, polc- és oszlopműveletek, tárgyak áthúzása, szekrénysor-elrendezés, visszavonás/újra, CSV- és PDF-export.
+
+A logikai függvényeket a tesztek a `window.__bt` tesztelési felületen keresztül, közvetlenül hívják; a felhasználói folyamatokat valódi böngészőben futtatják.
+
+A **GitHub Actions** (`.github/workflows/ci.yml`) minden pull requestnél és a `main` ágra pusholáskor lefut: Python build szkriptek, build-egyezés a commitolt HTML-ekkel, JS szintaxis, majd az összes teszt. Rögzített verziók: Ubuntu 24.04, Python 3.12, Node 22.12.0, `@playwright/test` 1.65.1 (`package-lock.json`). Hiba esetén a tesztjelentés letölthető a futás oldaláról.

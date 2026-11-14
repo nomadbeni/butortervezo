@@ -51,9 +51,31 @@ const DEF={
   lgSeat:'Ülőfelület / bútor test',lgTrim:'Bőr könyöklő / díszperem',lgBack:'Háttámla',lgPil:'Párna / fekvőrész',extra:[]},
  b:{items:null,sel:''}
 };
+/* ---------- adatellenőrzés (import és tárolt állapot) ---------- */
+const KP_LIM={items:300,tab:20,extra:30,coord:20000,size:10000};
+const KP_STR={title:120,proj:120,client:120,author:120,date:40,lTotW:120,lTotH:120,lgSeat:120,lgTrim:120,lgBack:120,lgPil:120};
+const KP_NUM={H:[0,300],leg:[0,100],cush:[0,100],D:[0,500],bH:[0,200],bD:[0,300]};
+const KP_DIM=['off','tot','chain','edge'],KP_FLAG=['totW','totH','seams','lbl','trimSum','area'];
+function validateKp(d){
+ const dp=isObj(d.p)?d.p:{},p={};
+ for(const k in DEF.p){const v=dp[k],dv=DEF.p[k];
+  if(k==='extra')p.extra=(Array.isArray(v)?v:[]).slice(0,KP_LIM.extra).filter(isObj).map(x=>({l:vStr(x.l,120),v:vStr(x.v,120)}));
+  else if(KP_STR[k])p[k]=typeof v==='string'||typeof v==='number'?vStr(v,KP_STR[k]):dv;
+  else if(KP_NUM[k]){const n=vNumOpt(v,KP_NUM[k][0],KP_NUM[k][1],NaN);p[k]=ok(n)?String(n):dv}
+  else if(k==='snap')p[k]=vOne(String(v),['1','5','10'],dv);
+  else if(/^d[TBLR]$/.test(k))p[k]=vOne(v,KP_DIM,dv);
+  else if(KP_FLAG.includes(k))p[k]=v===undefined?dv:vFlag(v);
+  else p[k]=dv}
+ const db=vObj(d.b,'elemek'),idMap={};
+ const items=vArr(db.items,KP_LIM.items,'elemek').map((b,i)=>{const n=`${i+1}. elem`;vObj(b,n);const id=uid();if(typeof b.id==='string')idMap[b.id]=id;
+  return {id,name:vStr(b.name,80)||'Elem',type:vOne(b.type,Object.keys(TY),'seat'),
+   x:vNum(b.x,-KP_LIM.coord,KP_LIM.coord,n+' x'),y:vNum(b.y,-KP_LIM.coord,KP_LIM.coord,n+' y'),
+   w:vNum(b.w,.1,KP_LIM.size,n+' szélesség'),h:vNum(b.h,.1,KP_LIM.size,n+' mélység'),dw:b.dw?1:0,dh:b.dh?1:0,
+   tab:(Array.isArray(b.tab)?b.tab:[]).slice(0,KP_LIM.tab).filter(isObj).map(r=>({f:vOne(r.f,['w','h','wh'],'w'),l:vStr(r.l,120)}))}});
+ return {p,b:{items,sel:''},idMap}}
 S=loadState('kp',DEF);
-if(!Array.isArray(S.b.items))S.b.items=TPL.kep.items();
-if(!Array.isArray(S.p.extra))S.p.extra=[];
+{let v=null;if(Array.isArray(S.b.items)){try{v=validateKp({p:S.p,b:S.b})}catch(e){v=null;setTimeout(()=>toast('A tárolt terv hibás volt, a minta töltődött be.'),400)}}
+ if(v){const sel=v.idMap[S.b.sel]||'';S.p=v.p;S.b=v.b;S.b.sel=sel}else{S.p=validateKp({p:S.p,b:{items:[]}}).p;S.b={items:TPL.kep.items(),sel:''}}}
 
 /* ---------- segédek ---------- */
 const f=v=>Math.round(v*100)/100;
@@ -341,11 +363,10 @@ function exportPDF(){let el=$('#rep');if(!el){el=document.createElement('div');e
  const done=()=>{document.body.classList.remove('rep-on');document.title=t;window.removeEventListener('afterprint',done)};window.addEventListener('afterprint',done);
  toast('A nyomtatási ablakban válaszd: Mentés PDF-ként');setTimeout(()=>window.print(),80)}
 function exportJSON(){download(fileBase()+'.json',JSON.stringify({app:'kanape',v:1,p:S.p,b:{items:S.b.items}},null,1),'application/json')}
-document.addEventListener('change',e=>{if(e.target.id!=='kp_file')return;const fl=e.target.files[0];if(!fl)return;const rd=new FileReader();
- rd.onload=()=>{const d=parse(rd.result);if(!d||d.app!=='kanape'||!d.b||!Array.isArray(d.b.items)){toast('Ez nem Kanapé-tervező fájl');return}
-  hist();S.p={...JSON.parse(JSON.stringify(DEF.p)),...d.p};if(!Array.isArray(S.p.extra))S.p.extra=[];
-  S.b={items:d.b.items.map(b=>({id:b.id||uid(),name:String(b.name||'Elem'),type:TY[b.type]?b.type:'seat',x:+b.x||0,y:+b.y||0,w:Math.max(1,+b.w||10),h:Math.max(1,+b.h||10),dw:b.dw?1:0,dh:b.dh?1:0,tab:Array.isArray(b.tab)?b.tab.map(r=>({f:['w','h','wh'].includes(r.f)?r.f:'w',l:String(r.l||'')})):[]})),sel:''};
-  ui.save();ui.render();toast('Betöltve: '+fl.name)};rd.readAsText(fl);e.target.value=''});
+/* import: előbb teljes ellenőrzés, csak hibátlan fájl után változik a terv */
+function applyImport(v,name){hist();S.p=v.p;S.b=v.b;ui.save();ui.render();toast('Betöltve: '+name)}
+document.addEventListener('change',e=>{if(e.target.id!=='kp_file')return;const fl=e.target.files[0];e.target.value='';if(!fl)return;
+ readImport(fl,'kanape','Kanapé-tervező',validateKp).then(v=>applyImport(v,fl.name),err=>toast('Nem sikerült betölteni: '+err.message))});
 document.addEventListener('focusin',e=>{if(e.target.closest('main')&&/INPUT|SELECT|TEXTAREA/.test(e.target.tagName))hist()});
 document.addEventListener('click',e=>{if(e.target.closest('[data-seg][data-t]'))hist()},true);
 document.addEventListener('keydown',e=>{const tg=e.target,inF=/INPUT|SELECT|TEXTAREA/.test(tg.tagName),mod=e.ctrlKey||e.metaKey,k=e.key.toLowerCase();
@@ -430,3 +451,5 @@ const ui=shell({prefix:'kp',tabs:[['plan','Felülnézet','Felül','plan'],['side
  onMenu(m){act(m,{dataset:{}})}});
 document.body.insertAdjacentHTML('beforeend','<input type="file" id="kp_file" accept=".json,application/json" hidden>');
 ui.render();
+/* tesztelési felület (tests/*.spec.mjs) */
+window.__bt=Object.freeze({get S(){return S},validateKp,bbox,overlaps,trimLen,seatArea,snapMove,snapE,loadTpl,TPL,exportJSON,fileBase,undo,redo,act,safeName});
