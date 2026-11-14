@@ -1,15 +1,21 @@
-import sys,os
+import sys,os,re,hashlib,base64
 SP=os.path.dirname(os.path.abspath(__file__))+'/'
 CSS=open(SP+'common.css').read()
 CORE=open(SP+'core.js').read()
+CSP=open(SP+'csp.txt').read().strip()  # a tesztek (tests/check.mjs) betűre ellenőrzik
 EXTRA_CSS='''
 .logo{background:var(--logo)!important}
 '''
+def with_script_hash(html):
+    '''A CSP script-src helyére a beágyazott szkript(ek) SHA-256 hash-e kerül: más szkript nem futhat.'''
+    hs=' '.join("'sha256-"+base64.b64encode(hashlib.sha256(m.encode('utf-8')).digest()).decode()+"'" for m in re.findall(r'<script>(.*?)</script>',html,re.S))
+    return html.replace('{SCRIPT_HASH}',hs)
 def page(fname,title,themecolor,logo_grad,logo_svg,favicon_svg,accent_css,body_extra,script,extra_css=''):
     html=f'''<!doctype html>
 <html lang="hu">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="{CSP}">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="{themecolor}">
 <title>{title}</title>
@@ -52,5 +58,6 @@ def page(fname,title,themecolor,logo_grad,logo_svg,favicon_svg,accent_css,body_e
 </body>
 </html>
 '''
+    html=with_script_hash(html)
     open(os.path.join(SP,'..',fname),'w',encoding='utf-8').write(html)
     print('wrote',fname,len(html))

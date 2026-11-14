@@ -1,0 +1,12 @@
+# A commit-azonosítóra rögzített GitHub Actions lépések frissítése: havonta egy PR, minden frissítés együtt.
+# Az angol commit üzenete sérti a tároló szabályait, ezért nem fésüljük össze, ahogy van:
+# egy ügynök egy saját, magyar commitba veszi át (lásd AGENTS.md).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]

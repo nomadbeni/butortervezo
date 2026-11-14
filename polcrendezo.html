@@ -2,6 +2,7 @@
 <html lang="hu">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-QTeBoFeBFwKujr0x0Wx8jkhCDaax2PP5ajbV+uujU90='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; worker-src 'none'; frame-src 'none'">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0f766e">
 <title>Polcrendező</title>
@@ -260,15 +261,13 @@ select.sel.addc{width:auto;padding:6px 10px;font-size:13px;font-weight:600}
 (()=>{
 'use strict';
 /* ===== közös alap (app keret, mezők, téma, menü) ===== */
-const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)];
+const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
+const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v);return true}catch(e){return false}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
 const parse=s=>{try{return JSON.parse(s)}catch(e){return null}};
 const num=v=>{if(v==null)return NaN;if(typeof v==='number')return v;const s=String(v).replace(/\s/g,'').replace(',','.');return s===''?NaN:+s};
 const ok=x=>Number.isFinite(x);
 function fmt(x,d=2){if(!ok(x))return '–';const a=Math.abs(x);let dd=d;if(a>=1000)dd=0;else if(a>=100)dd=Math.min(d,1);return x.toLocaleString('hu-HU',{minimumFractionDigits:0,maximumFractionDigits:dd})}
-const fmtF=(x,d)=>ok(x)?x.toLocaleString('hu-HU',{minimumFractionDigits:d,maximumFractionDigits:d}):'–';
-const fmtFt=x=>ok(x)?Math.round(x).toLocaleString('hu-HU')+' Ft':'–';
 let toastT=0;function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>e.classList.remove('on'),2200)}
 const uid=()=>Math.random().toString(36).slice(2,10);
 const IC={
@@ -278,24 +277,22 @@ const IC={
 };
 const ic=(k,w=18)=>`<svg viewBox="0 0 24 24" width="${w}" height="${w}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${IC[k]||''}</svg>`;
 /* field builders – S[t][k] */
-const unitSel=(t,uk,opts)=>`<select data-t="${t}" data-k="${uk}">${opts.map(u=>`<option ${S[t][uk]===u?'selected':''}>${u}</option>`).join('')}</select>`;
-const fld=(t,k,label,o={})=>{const v=S[t][k]??'';const unit=o.units?unitSel(t,o.uk,o.units):(o.u?`<span class="u">${o.u}</span>`:'');
- return `<div class="f"${o.style?` style="${o.style}"`:''}><label for="i_${t}_${k}">${label}</label><div class="iw"><input id="i_${t}_${k}" data-t="${t}" data-k="${k}" inputmode="decimal" autocomplete="off" value="${esc(v)}" placeholder="${esc(o.ph||'')}">${unit}</div></div>`};
+const fld=(t,k,label,o={})=>{const v=S[t][k]??'';const unit=o.u?`<span class="u">${o.u}</span>`:'';
+ return `<div class="f"${o.style?` style="${o.style}"`:''}><label for="i_${t}_${k}">${label}</label><div class="iw"><input id="i_${t}_${k}" data-t="${t}" data-k="${k}" maxlength="120" inputmode="decimal" autocomplete="off" value="${esc(v)}" placeholder="${esc(o.ph||'')}">${unit}</div></div>`};
 const seg=(t,k,opts)=>`<div class="seg">${opts.map(([v,l])=>`<button type="button" data-t="${t}" data-seg="${k}" data-v="${v}" class="${S[t][k]===v?'on':''}">${l}</button>`).join('')}</div>`;
-const sel=(t,k,opts,label)=>`<div class="f"><label>${label}</label><select class="sel" data-t="${t}" data-k="${k}">${opts.map(o=>{const [v,l]=Array.isArray(o)?o:[o,o];return `<option value="${esc(v)}" ${S[t][k]===v?'selected':''}>${esc(l)}</option>`}).join('')}</select></div>`;
-const kv=(id,label,unit,o={})=>`<div class="kv${o.big?' big':''}"><small>${label}</small><b id="${id}">–</b>${unit?`<i>${unit}</i>`:''}${o.alt?`<span class="alt" id="${id}_alt"></span>`:''}</div>`;
-const set=(id,v,alt)=>{const e=document.getElementById(id);if(e)e.textContent=v;if(alt!==undefined){const a=document.getElementById(id+'_alt');if(a)a.textContent=alt}};
 async function download(name,text,type){const blob=new Blob([text],{type});const file=new File([blob],name,{type});
  if(navigator.canShare&&/Mobi|Android|iPhone|iPad/.test(navigator.userAgent)&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file],title:name});return}catch(e){if(e.name==='AbortError')return}}
  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)}
 const safeName=s=>(s||'export').replace(/[^\p{L}\p{N}\-_ ]/gu,'').trim().replace(/\s+/g,'_')||'export';
-const csvQ=v=>{v=String(v??'');return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
-async function copyText(t){try{await navigator.clipboard.writeText(t);return true}catch(e){const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();let r=false;try{r=document.execCommand('copy')}catch(_){}ta.remove();return r}}
+/* CSV-cella: a képletként értelmezhető kezdőkaraktert (= + - @ TAB CR) aposztróf semlegesíti (CSV-injektálás ellen) */
+const csvQ=v=>{v=String(v??'');if(/^[=+\-@\t\r]/.test(v))v="'"+v;return /[;"\r\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
 /* app shell */
 function shell(cfg){
  // cfg: {prefix, tabs:[[key,label,short,icon]], R, onClick(act,el), onInput(el), menu(), onMenu(m), afterRender()}
- let tab=store.get(cfg.prefix+'.tab');if(!cfg.R[tab])tab=cfg.tabs[0][0];
- let saveT=0;const save=()=>{clearTimeout(saveT);saveT=setTimeout(()=>store.set(cfg.prefix+'.state',JSON.stringify(S)),250)};
+ let tab=store.get(cfg.prefix+'.tab');if(!cfg.tabs.some(t=>t[0]===tab))tab=cfg.tabs[0][0];
+ /* mentés: ha az app ad guard()-ot, csak érvényes állapot kerül a tárolóba (a guard vissza is állíthat) */
+ let saveT=0;const save=()=>{if(cfg.guard&&!cfg.guard())return false;clearTimeout(saveT);
+  saveT=setTimeout(()=>{if(!store.set(cfg.prefix+'.state',JSON.stringify(S)))toast('Nem sikerült menteni a böngészőbe (megtelt a tárhely?). Mentsd a tervet JSON-ba.')},250);return true};
  const navHTML=c=>cfg.tabs.map(([k,l,sh,icn],i)=>`${c==='side'&&cfg.sep&&cfg.sep.includes(i)?'<hr>':''}<button data-tab="${k}" class="${tab===k?'on':''}">${ic(icn||k)}<span>${c==='side'?l:sh}</span></button>`).join('')+(c==='side'?`<hr><div class="ver">${cfg.note||'Számítások tájékoztató jellegűek, a tervezői felelősséget nem váltják ki.'}</div>`:'');
  function render(){const r=cfg.R[tab];$('#side').innerHTML=navHTML('side');$('#bot').innerHTML=navHTML('bot');
   $('#main').innerHTML=`<div class="ph"><div><h1>${r.title}</h1><p>${r.desc}</p></div></div>${r.html()}`;r.calc();cfg.afterRender&&cfg.afterRender();
@@ -322,7 +319,8 @@ const IMP_MAX_BYTES=2*1024*1024;
 class ImportErr extends Error{constructor(m){super(m);this.name='ImportErr'}}
 const impFail=m=>{throw new ImportErr(m)};
 const isObj=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
-const vStr=(v,max=200,def='')=>(typeof v==='string'?v:(typeof v==='number'&&Number.isFinite(v)?String(v):def)).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g,'').slice(0,max);
+/* egysoros szöveg: sortörés és TAB szóközre, egyéb vezérlőkarakter törölve, hossz korlátozva */
+const vStr=(v,max=200,def='')=>(typeof v==='string'?v:(typeof v==='number'&&Number.isFinite(v)?String(v):def)).replace(/[\t\r\n]+/g,' ').replace(/[\u0000-\u001f\u007f]/g,'').slice(0,max);
 const vNumRaw=v=>typeof v==='number'?v:(typeof v==='string'&&v.trim()!==''&&v.length<40?num(v):NaN);
 const vNum=(v,lo,hi,what)=>{const n=vNumRaw(v);if(!Number.isFinite(n)||n<lo||n>hi)impFail(`Érvénytelen érték: ${what} (${lo} és ${hi} közötti szám kell)`);return n};
 const vNumOpt=(v,lo,hi,def)=>{const n=vNumRaw(v);return Number.isFinite(n)?Math.min(hi,Math.max(lo,n)):def};
@@ -330,7 +328,7 @@ const vArr=(v,max,what,min=0)=>{if(!Array.isArray(v))impFail(`Hiányzó vagy hib
 const vObj=(v,what)=>{if(!isObj(v))impFail(`Hibás adat: ${what}`);return v};
 const vOne=(v,list,def)=>list.includes(v)?v:def;
 const vFlag=v=>v===true||v===1||v==='1'?'1':'';
-const SAFE_ID=/^[a-z0-9]{1,16}$/;
+const vBool=v=>v===true||v===1||v==='1'?1:0;
 function parseImport(text,app,appName){if(typeof text!=='string')impFail('A fájl nem szöveges.');
  if(text.length>IMP_MAX_BYTES)impFail('A fájl túl nagy (legfeljebb 2 MB lehet).');
  let d;try{d=JSON.parse(text)}catch(e){impFail('A fájl nem érvényes JSON.')}
@@ -342,6 +340,21 @@ function readImport(file,app,appName,validate){return new Promise((res,rej)=>{
  const rd=new FileReader();rd.onerror=()=>rej(new ImportErr('A fájl nem olvasható.'));
  rd.onload=()=>{try{res(validate(parseImport(rd.result,app,appName)))}catch(e){rej(e instanceof ImportErr?e:new ImportErr('Hibás tervfájl.'))}};
  rd.readAsText(file)})}
+/* ===== tárolt terv védelme =====
+   Betöltéskor hibás tárolt terv: az eredeti szöveg a <prefix>.state.bak kulcsra kerül, és a menüből letölthető (nem vész el csendben).
+   Szerkesztéskor: az app guard()-ja minden mentés előtt ugyanazzal az ellenőrzéssel nézi az állapotot, mint az import;
+   ha nem felel meg (pl. túl nagy méret, túl sok elem), a módosítást visszavonja, így a tárolt terv mindig betölthető marad. */
+const bakKey=p=>p+'.state.bak';
+function keepBadState(prefix){const raw=store.get(prefix+'.state');if(raw)store.set(bakKey(prefix),raw)}
+const bakMenu=prefix=>store.get(bakKey(prefix))?`<button class="mi" data-m="bak">${ic('dl')}Hibás tárolt terv letöltése</button>`:'';
+function downloadBak(prefix){const raw=store.get(bakKey(prefix));if(!raw)return;download(prefix+'_hibas_tarolt_terv.json',raw,'application/json');store.del(bakKey(prefix));toast('Letöltve; a böngészőből törölve.')}
+/* check(): érvényes-e az állapot; snapshot(): az állapot szövegként; apply(d): visszaállítás egy korábbi pillanatképre.
+   Visszaállítás mindig az utolsó, ellenőrzésen átment állapotra történik (nem a visszavonási verem tetejére). */
+function makeGuard(check,snapshot,apply){let busy=false,last=null;
+ return ()=>{if(busy)return true;try{check();last=snapshot();return true}catch(e){
+  busy=true;const msg=e instanceof ImportErr?e.message:'Érvénytelen állapot.';
+  try{if(last){apply(JSON.parse(last));toast(msg+' A módosítás visszavonva.')}else toast(msg+' A terv nem menthető: mentsd JSON-ba.')}
+  catch(_){toast('A terv nem menthető: mentsd JSON-ba.')}finally{busy=false}return false}}}
 
 /* ================= Polcrendező ================= */
 Object.assign(IC,{
@@ -415,17 +428,27 @@ const nItems=c=>c.cols.reduce((s,col)=>s+col.rows.reduce((t,r)=>t+r.items.length
 
 /* ---------- arányos méretezés ----------
    A rögzítetlen elemek egymás közti aránya megmarad, a rögzített (lakat) és az éppen szerkesztett elem mérete nem változik. */
-function fit(arr,key,total,keep=-1){const n=arr.length;if(!n)return;
- if(n===1){arr[0][key]=r1(total);return}
- let fx=[],fl=[];arr.forEach((x,i)=>(i===keep||x.lock?fx:fl).push(i));
- if(!fl.length){fl=arr.map((_,i)=>i).filter(i=>i!==keep);fx=keep>=0?[keep]:[]}
+/* visszatérés: 'ok' – minden rögzített és a szerkesztett elem megmaradt; 'adj' – a szerkesztett elem a rögzítettek
+   miatt más méretet kapott; 'lock' – a rögzített elemek nem fértek el, ezért ezek is változtak */
+function fit(arr,key,total,keep=-1){const n=arr.length;if(!n)return 'ok';
+ if(n===1){const o=arr[0][key];arr[0][key]=r1(total);return Math.abs(o-total)<.05||keep<0?'ok':'adj'}
+ let fx=[],fl=[],st='ok';arr.forEach((x,i)=>(i===keep||x.lock?fx:fl).push(i));
+ if(!fl.length){
+  if(keep>=0){const others=arr.reduce((s,x,i)=>i===keep?s:s+(+x[key]||0),0),v=r1(total-others);
+   if(v>=MINR){const ch=Math.abs(v-arr[keep][key])>.05;arr[keep][key]=v;return ch?'adj':'ok'}}
+  fl=arr.map((_,i)=>i).filter(i=>i!==keep);fx=keep>=0?[keep]:[];st='lock'}
+ else if(keep>=0){/* a szerkesztett érték ne nyomja össze a rögzítetteket: legfeljebb a maradék hely (a szabadoknak min. MINR) */
+  const locked=fx.reduce((s,i)=>i===keep?s:s+(+arr[i][key]||0),0),mx=r1(total-locked-fl.length*MINR);
+  if(mx>=MINR&&arr[keep][key]>mx){arr[keep][key]=mx;st='adj'}}
  const sf=fx.reduce((s,i)=>s+(+arr[i][key]||0),0);let free=total-sf;
- if(free<fl.length*MINR){free=fl.length*MINR;const rem=total-free;fx.forEach(i=>arr[i][key]=sf>0?Math.max(MINR,arr[i][key]*rem/sf):MINR)}
+ if(free<fl.length*MINR){free=fl.length*MINR;const rem=total-free;fx.forEach(i=>arr[i][key]=sf>0?Math.max(MINR,arr[i][key]*rem/sf):MINR);
+  st=fx.some(i=>i!==keep)?'lock':'adj'}
  const sl=fl.reduce((s,i)=>s+Math.max(0,+arr[i][key]||0),0);
  fl.forEach(i=>arr[i][key]=sl>0?Math.max(0,+arr[i][key]||0)*free/sl:free/fl.length);
  arr.forEach(x=>x[key]=r1(x[key]));
- const diff=r1(total-arr.reduce((s,x)=>s+x[key],0)),li=fl[fl.length-1];arr[li][key]=r1(arr[li][key]+diff)}
-function fitCab(c,colKeep=-1){fit(c.cols,'w',clearW(c),colKeep);for(const col of c.cols)fit(col.rows,'h',clearH(c,col))}
+ const diff=r1(total-arr.reduce((s,x)=>s+x[key],0)),li=fl[fl.length-1];arr[li][key]=r1(arr[li][key]+diff);return st}
+function fitCab(c,colKeep=-1){let st=fit(c.cols,'w',clearW(c),colKeep);for(const col of c.cols)if(fit(col.rows,'h',clearH(c,col))==='lock')st='lock';return st}
+const fitMsg=(st,what)=>{if(st==='lock')toast(`A rögzített ${what} nem fértek el, ezért ezek is arányosan változtak.`);else if(st==='adj')toast(`A rögzített ${what} miatt ez az érték a maradék helyhez igazodott.`)};
 function evenOut(arr,key,total){arr.forEach(x=>{x[key]=1;x.lock=0});fit(arr,key,total)}
 const mkRow=(h,kind='shelf')=>({id:uid(),h,lock:0,kind,items:[]});
 function mkCab(type,pi=0,nm){const [pn,p]=PRE[type][pi];
@@ -459,18 +482,18 @@ function demo(){
  S.c.groups=[G];return [b,k,a,d,e]}
 /* ---------- adatellenőrzés (import és tárolt állapot) ----------
    Az azonosítók mindig újak; a sor-hivatkozások és a kijelölés átíródnak. Hibánál ImportErr, a terv nem változik. */
-const PR_LIM={cabs:200,groups:50,cols:8,rows:40,items:200,itemsTotal:5000};
+const PR_LIM={cabs:200,groups:50,cols:8,rows:40,cells:2000,items:200,itemsTotal:5000};
 const PR_STR={title:120,proj:120,author:120,date:40};
 function validatePr(d){
  const dp=isObj(d.p)?d.p:{},p={};
  for(const k in DEF.p)p[k]=PR_STR[k]?(typeof dp[k]==='string'||typeof dp[k]==='number'?vStr(dp[k],PR_STR[k]):DEF.p[k]):(dp[k]===undefined?DEF.p[k]:vFlag(dp[k]));
  const idMap={},gMap={};
  const groups=(d.groups==null?[]:vArr(d.groups,PR_LIM.groups,'szekrénysorok')).map((G,i)=>{vObj(G,`${i+1}. szekrénysor`);const id=uid();if(typeof G.id==='string')gMap[G.id]=id;return {id,name:vStr(G.name,60)||'Sor'}});
- let tot=0;
+ let tot=0,cells=0;
  const list=vArr(d.list,PR_LIM.cabs,'szekrények').map((c,ci)=>{vObj(c,`${ci+1}. szekrény`);const n=`„${vStr(c.name,40)||ci+1+'. szekrény'}”`;
   const o={id:uid(),name:vStr(c.name,80)||'Szekrény',type:vOne(c.type,Object.keys(TYP),'allo'),
    W:vNum(c.W,5,2000,n+' szélesség'),H:vNum(c.H,5,1000,n+' magasság'),D:vNum(c.D,1,500,n+' mélység'),
-   t:vNumOpt(c.t,.3,10,1.8),pl:vNumOpt(c.pl,0,200,0),top:vNumOpt(c.top,0,50,0),fal:c.fal?1:0,
+   t:vNumOpt(c.t,.3,10,1.8),pl:vNumOpt(c.pl,0,200,0),top:vNumOpt(c.top,0,50,0),fal:vBool(c.fal),
    g:typeof c.g==='string'&&gMap[c.g]?gMap[c.g]:'',gap:vNumOpt(c.gap,0,1000,0),elev:0,cols:[]};
   o.elev=vNumOpt(c.elev,0,500,o.fal?150:0);
   if(typeof c.id==='string')idMap[c.id]=o.id;
@@ -478,16 +501,16 @@ function validatePr(d){
   const cols=vArr(c.cols,PR_LIM.cols,n+' oszlopai',1);
   if(o.W<=2*o.t+(cols.length-1)*o.t+cols.length*MINR)impFail(`${n}: a szélesség túl kicsi ennyi oszlophoz.`);
   o.cols=cols.map((col,k)=>{vObj(col,`${n} ${k+1}. oszlopa`);const cid=uid();if(typeof col.id==='string')idMap[col.id]=cid;
-   const rows=vArr(col.rows,PR_LIM.rows,`${n} ${k+1}. oszlopának rekeszei`,1);
-   return {id:cid,w:vNumOpt(col.w,.1,2000,10),lock:col.lock?1:0,rows:rows.map((r,ri)=>{vObj(r,`${n} rekesze`);const rid=uid();if(typeof r.id==='string')idMap[r.id]=rid;
+   const rows=vArr(col.rows,PR_LIM.rows,`${n} ${k+1}. oszlopának rekeszei`,1);cells+=rows.length;if(cells>PR_LIM.cells)impFail(`Túl sok rekesz összesen (legfeljebb ${PR_LIM.cells}).`);
+   return {id:cid,w:vNumOpt(col.w,.1,2000,10),lock:vBool(col.lock),rows:rows.map((r,ri)=>{vObj(r,`${n} rekesze`);const rid=uid();if(typeof r.id==='string')idMap[r.id]=rid;
     const its=r.items==null?[]:vArr(r.items,PR_LIM.items,`${n} egy rekeszének tárgyai`);tot+=its.length;if(tot>PR_LIM.itemsTotal)impFail(`Túl sok tárgy (legfeljebb ${PR_LIM.itemsTotal}).`);
-    return {id:rid,h:vNumOpt(r.h,.1,1000,10),lock:r.lock?1:0,kind:r.kind==='drawer'?'drawer':'shelf',
+    return {id:rid,h:vNumOpt(r.h,.1,1000,10),lock:vBool(r.lock),kind:r.kind==='drawer'?'drawer':'shelf',
      items:its.filter(isObj).map(it=>({id:uid(),n:vStr(it.n,120),q:vStr(it.q,20),col:Math.round(vNumOpt(it.col,0,ICOL.length-1,0))}))}})}});
   if(o.cols.reduce((s,col)=>Math.max(s,col.rows.length),0)*MINR+(o.cols.reduce((s,col)=>Math.max(s,col.rows.length),0)+1)*o.t>o.H-o.pl-o.top)impFail(`${n}: a magasság túl kicsi ennyi polchoz.`);
   fitCab(o);return o});
  const used=new Set(list.map(c=>c.g));
  return {p,list,groups:groups.filter(G=>used.has(G.id)),idMap}}
-{let v=null;if(Array.isArray(S.c.list)){try{v=validatePr({p:S.p,list:S.c.list,groups:S.c.groups})}catch(e){v=null;setTimeout(()=>toast('A tárolt terv hibás volt, a minta töltődött be.'),400)}}
+{let v=null;if(Array.isArray(S.c.list)){try{v=validatePr({p:S.p,list:S.c.list,groups:S.c.groups})}catch(e){v=null;keepBadState('pr');setTimeout(()=>toast('A tárolt terv hibás volt, a minta töltődött be. Az eredeti a menüből letölthető.'),400)}}
  if(v){S.p=v.p;S.c.list=v.list;S.c.groups=v.groups;S.c.sel=v.idMap[S.c.sel]||'';S.c.cell=v.idMap[S.c.cell]||''}
  else{S.p=validatePr({p:S.p,list:[]}).p;S.c.groups=[];S.c.list=demo()}
  S.c.view=vOne(S.c.view,['row','single'],'row')}
@@ -495,9 +518,10 @@ cleanGroups();
 
 /* ---------- visszavonás ---------- */
 let U=[],RD=[];
-const snap=()=>JSON.stringify({p:S.p,list:S.c.list,groups:S.c.groups});
-function hist(){const s=snap();if(U[U.length-1]===s)return;U.push(s);if(U.length>80)U.shift();RD=[]}
-function restore(s){const d=parse(s);if(!d)return;S.p=d.p;S.c.list=d.list;S.c.groups=d.groups||[];ui.save();ui.render()}
+const snap=()=>JSON.stringify({p:S.p,list:S.c.list,groups:S.c.groups,sel:S.c.sel,cell:S.c.cell});
+let lastRD=[];
+function hist(){const s=snap();if(U[U.length-1]===s)return;U.push(s);if(U.length>80)U.shift();lastRD=RD;RD=[]}
+function restore(s){const d=parse(s);if(!d)return;S.p=d.p;S.c.list=d.list;S.c.groups=d.groups||[];S.c.sel=d.sel||'';S.c.cell=d.cell||'';ui.save();ui.render()}
 function undo(){if(!U.length){toast('Nincs mit visszavonni');return}const cur=snap();let s=U.pop();while(s===cur&&U.length)s=U.pop();if(s===cur){toast('Nincs mit visszavonni');return}RD.push(cur);restore(s)}
 function redo(){if(!RD.length){toast('Nincs mit újra végrehajtani');return}U.push(snap());restore(RD.pop())}
 
@@ -662,7 +686,7 @@ function endDrag(e,cancel){if(!DR)return;const d=DR;DR=null;const gh=$('#pr_ghos
 document.addEventListener('pointerup',e=>endDrag(e));
 document.addEventListener('pointercancel',e=>endDrag(e,1));
 function moveItem(iid,rowId,silent){const fi=findItem(iid),tr=findRow(rowId);if(!fi||!tr||fi.row.id===rowId)return;hist();
- fi.row.items.splice(fi.ii,1);tr.row.items.push(fi.it);S.c.sel=tr.c.id;S.c.cell=rowId;ui.save();drawEditor();renderPanel();renderTabs();
+ fi.row.items.splice(fi.ii,1);tr.row.items.push(fi.it);S.c.sel=tr.c.id;S.c.cell=rowId;if(!ui.save())return;drawEditor();renderPanel();renderTabs();
  if(!silent)toast(`${fi.it.n||'Tárgy'} → ${tr.c.name}, ${code(tr.c,tr.ci,tr.ri)}`)}
 function stats(){const el=$('#pr_stats'),c=cab();if(!el)return;if(!c){el.innerHTML='';return}
  const sh=c.cols.reduce((s,col)=>s+col.rows.length-1,0),nr=c.cols.reduce((s,col)=>s+col.rows.length,0),dr=c.cols.reduce((s,col)=>s+col.rows.filter(r=>r.kind==='drawer').length,0);
@@ -682,7 +706,7 @@ function renderPanel(){const el=$('#pr_props');if(!el)return;const c=cab();
  let fr=S.c.cell?findRow(S.c.cell):null;if(fr&&fr.c.id!==c.id)fr=null;
  const tsel=Object.entries(TYP).map(([k,v])=>`<button type="button" class="${c.type===k?'on':''}" data-act="ctype" data-v="${k}">${v.s}</button>`).join('');
  let h=`<div class="card"><h2><span>Szekrény</span><span class="row" style="gap:4px"><button class="btn sm" data-act="cdup" title="Másolat">${ic('copy',14)}</button><button class="btn sm danger" data-act="cdel" title="Szekrény törlése">${ic('trash',14)}</button></span></h2>
-  <div class="f"><label for="cf_name">Megnevezés</label><input class="txt" id="cf_name" data-cname value="${esc(c.name)}" autocomplete="off"></div>
+  <div class="f"><label for="cf_name">Megnevezés</label><input class="txt" id="cf_name" data-cname maxlength="80" value="${esc(c.name)}" autocomplete="off"></div>
   <div class="f"><span class="l">Típus</span><div class="seg">${tsel}</div></div>
   <select class="sel" id="pr_pre"><option value="">Méret-sablon (${TYP[c.type].s})…</option>${PRE[c.type].map(([n],i)=>`<option value="${i}">${esc(n)}</option>`).join('')}</select>
   <div class="fields f3">${numIn('cf_W','Szélesség',L1(c.W),'data-cf="W"')}${numIn('cf_H','Magasság',L1(c.H),'data-cf="H"')}${numIn('cf_D','Mélység',L1(c.D),'data-cf="D"')}${numIn('cf_t','Lapvastagság',L1(c.t),'data-cf="t"')}${numIn('cf_pl','Lábazat',L1(c.pl),'data-cf="pl"')}${numIn('cf_top','Munkalap',L1(c.top),'data-cf="top"')}${numIn('cf_nc','Oszlopok',c.cols.length,'data-cnc','db')}</div>
@@ -693,7 +717,7 @@ function renderPanel(){const el=$('#pr_props');if(!el)return;const c=cab();
   <p class="hint">A magasság a lábazattal és a munkalappal együtt értendő. Méretváltozáskor a polcközök <b>arányosan</b> változnak, a lakattal rögzítettek nem.</p></div>`;
  const G=grp(c.g);
  if(G){const L=rowLayout(G.id);h=`<div class="card"><h2><span>Szekrénysor</span><span class="pill na">${L.cs.length} szekrény</span></h2>
-  <div class="f"><label for="g_name">Sor neve</label><input class="txt" id="g_name" data-gname value="${esc(G.name)}" autocomplete="off"></div>
+  <div class="f"><label for="g_name">Sor neve</label><input class="txt" id="g_name" data-gname maxlength="60" value="${esc(G.name)}" autocomplete="off"></div>
   <p class="hint" style="margin:0">Teljes szélesség <b>${L1(L.W)} cm</b>, legmagasabb pont <b>${L1(L.H)} cm</b>. Az álló szekrények a padlón sorakoznak, a falra szereltek a megadott magasságban, a magasabb álló szekrényeket kikerülve.</p>
   <div class="row"><select class="sel addc" id="g_add"><option value="">+ Szekrény a sorba…</option>${Object.entries(PRE).map(([k,a])=>`<optgroup label="${TYP[k].n}">${a.map(([n],i)=>`<option value="${k}:${i}">${esc(n)}</option>`).join('')}</optgroup>`).join('')}</select><button class="btn sm danger" data-act="gdel">${ic('trash',14)}Sor feloszlatása</button></div></div>`+h}
  if(fr){const {col,ci,ri,row}=fr,cd=code(c,ci,ri),nC=c.cols.length;
@@ -705,12 +729,12 @@ function renderPanel(){const el=$('#pr_props');if(!el)return;const c=cab();
    <div class="row"><div class="seg"><button type="button" class="${row.kind!=='drawer'?'on':''}" data-act="rkind" data-v="shelf">Polc</button><button type="button" class="${row.kind==='drawer'?'on':''}" data-act="rkind" data-v="drawer">Fiók</button></div></div>
    <div class="fields f2">${numIn('rw_h','Belmagasság (polcköz)',L1(row.h),'data-rowh','cm',lockBtn(row.lock,'rlock','Magasság rögzítése'))}</div>
    <div class="row"><button class="btn sm" data-act="rsplit" title="A rekeszt egy új polccal kettéosztja">${ic('split',14)}Polc beszúrása</button><button class="btn sm" data-act="rmerge" ${col.rows.length<2?'disabled':''} title="A rekesz alatti polcot elveszi (az utolsónál a felette lévőt)">${ic('minus',14)}Polc eltávolítása</button></div>
-   <div class="ilist">${row.items.map(it=>`<div class="irow"><button type="button" class="cdot" data-act="icol" data-id="${it.id}" style="background:${ICOL[it.col]}" title="Szín: ${ICOLN[it.col]} (katt: következő)"></button><input class="txt" id="in_${it.id}" data-in="${it.id}" value="${esc(it.n)}" placeholder="Tárgy neve" autocomplete="off"><input class="txt q" id="iq_${it.id}" data-iq="${it.id}" value="${esc(it.q)}" placeholder="db" autocomplete="off"><select class="sel mv" data-imv="${it.id}" aria-label="Áthelyezés">${moveOpts(row.id)}</select><button class="btn sm" data-act="iup" data-id="${it.id}" title="Feljebb a listában" aria-label="Feljebb">↑</button><button class="btn sm" data-act="idel" data-id="${it.id}" aria-label="Törlés">${ic('trash',14)}</button></div>`).join('')||'<p class="hint">Ez a rekesz még üres.</p>'}</div>
+   <div class="ilist">${row.items.map(it=>`<div class="irow"><button type="button" class="cdot" data-act="icol" data-id="${it.id}" style="background:${ICOL[it.col]}" title="Szín: ${ICOLN[it.col]} (katt: következő)"></button><input class="txt" id="in_${it.id}" data-in="${it.id}" maxlength="120" value="${esc(it.n)}" placeholder="Tárgy neve" autocomplete="off"><input class="txt q" id="iq_${it.id}" data-iq="${it.id}" maxlength="20" value="${esc(it.q)}" placeholder="db" autocomplete="off"><select class="sel mv" data-imv="${it.id}" data-cur="${row.id}" aria-label="Áthelyezés"><option value="">Áthelyezés…</option></select><button class="btn sm" data-act="iup" data-id="${it.id}" title="Feljebb a listában" aria-label="Feljebb">↑</button><button class="btn sm" data-act="idel" data-id="${it.id}" aria-label="Törlés">${ic('trash',14)}</button></div>`).join('')||'<p class="hint">Ez a rekesz még üres.</p>'}</div>
    <div class="addrow"><input class="txt" id="pr_new" placeholder="Új tárgy… (Enter)" autocomplete="off"><button class="btn sm pri" data-act="iadd">${ic('plus',14)}Hozzáad</button></div>
    <p class="hint">Több tárgy egyszerre: pontosvesszővel elválasztva (pl. Kávé; Tea; Cukor). A rajzon a tárgyak áthúzhatók egy másik rekeszbe (telefonon az „Áthelyezés…” listával).</p></div>`}
  else h+=`<div class="card"><p class="hint" style="margin:0">Koppints egy rekeszre a rajzon: ott adhatod meg a polcközt, a polcok számát és a tárgyakat.</p></div>`;
  el.innerHTML=h;stats()}
-function refresh(){cleanGroups();ui.save();drawEditor();renderPanel();renderTabs();renderView()}
+function refresh(){cleanGroups();const ok=ui.save();drawEditor();renderPanel();renderTabs();renderView();return ok}
 function renderView(){const el=$('#pr_view'),c=cab();if(!el)return;el.innerHTML=c&&grp(c.g)?`<div class="seg"><button type="button" class="${S.c.view!=='row'?'on':''}" data-act="view" data-v="single">Szekrény</button><button type="button" class="${S.c.view==='row'?'on':''}" data-act="view" data-v="row">Teljes sor</button></div>`:''}
 function later(fn){setTimeout(()=>{const aid=document.activeElement&&document.activeElement.id;fn();if(aid){const el=document.getElementById(aid);if(el&&document.activeElement!==el){el.focus();if(el.select&&el.tagName==='INPUT')el.select()}}},0)}
 
@@ -718,19 +742,19 @@ function later(fn){setTimeout(()=>{const aid=document.activeElement&&document.ac
 function setCols(c,n){n=clamp(Math.round(n),1,8);if(n===c.cols.length)return;
  if(n>c.cols.length){const last=c.cols[c.cols.length-1];while(c.cols.length<n)c.cols.push({id:uid(),w:last.w,lock:0,rows:last.rows.map(r=>mkRow(r.h,r.kind))})}
  else{const rem=c.cols.splice(n);const tgt=c.cols[c.cols.length-1];rem.forEach(col=>col.rows.forEach((r,ri)=>{const t=tgt.rows[Math.min(ri,tgt.rows.length-1)];t.items.push(...r.items)}))}
- c.cols.forEach(x=>x.lock=0);evenOut(c.cols,'w',clearW(c));for(const col of c.cols)fit(col.rows,'h',clearH(c,col))}
+ fitMsg(fitCab(c),'oszlopszélességek')}
 function setRows(c,col,n){n=clamp(Math.round(n),1,40);if(n===col.rows.length)return;
  if(n>col.rows.length){const avg=col.rows.reduce((s,r)=>s+r.h,0)/col.rows.length;while(col.rows.length<n)col.rows.push(mkRow(avg))}
  else{const rem=col.rows.splice(n);col.rows[n-1].items.push(...rem.flatMap(r=>r.items));if(!col.rows.some(r=>r.id===S.c.cell))S.c.cell=col.rows[n-1].id}
  fit(col.rows,'h',clearH(c,col))}
-function addItems(fr,txt){const names=String(txt).split(/[;\n]/).map(s=>s.trim()).filter(Boolean);if(!names.length)return 0;hist();
+function addItems(fr,txt){const names=String(txt).split(/[;\n]/).map(s=>s.trim().slice(0,120)).filter(Boolean);if(!names.length)return 0;hist();
  const last=fr.row.items[fr.row.items.length-1];for(const n of names)fr.row.items.push(mkIt(n,'',last?last.col:0));return names.length}
 function addCab(v,gid){if(v==='row'){rowDialog();return}const [k,i]=v.split(':');if(!PRE[k])return;hist();const c=mkCab(k,+i||0);
  if(gid&&grp(gid)){c.g=gid;const L=grpCabs(gid);const last=L[L.length-1];S.c.list.splice(S.c.list.indexOf(last)+1,0,c);S.c.view='row'}else S.c.list.push(c);
- S.c.sel=c.id;S.c.cell=c.cols[0].rows[0].id;ui.setTab('cab');ui.render();toast('Új szekrény: '+c.name+(c.g?` (sor: ${grp(c.g).name})`:''))}
+ S.c.sel=c.id;S.c.cell=c.cols[0].rows[0].id;if(!ui.save())return;ui.setTab('cab');ui.render();toast('Új szekrény: '+c.name+(c.g?` (sor: ${grp(c.g).name})`:''))}
 function rowDialog(){const opts=Object.entries(PRE).map(([k,a])=>`<optgroup label="${TYP[k].n}">${a.map(([n],i)=>`<option value="${k}:${i}" ${k==='konyha'&&i===0?'selected':''}>${esc(n)}</option>`).join('')}</optgroup>`).join('');
  $('#modalBody').innerHTML=`<h3>Szekrénysor létrehozása</h3>
-  <div class="fields f2"><div class="f"><label for="rn_name">Sor neve</label><input class="txt" id="rn_name" value="Konyha" autocomplete="off"></div>
+  <div class="fields f2"><div class="f"><label for="rn_name">Sor neve</label><input class="txt" id="rn_name" maxlength="60" value="Konyha" autocomplete="off"></div>
   <div class="f"><label for="rn_pre">Szekrény sablon</label><select class="sel" id="rn_pre">${opts}</select></div>
   ${numIn('rn_n','Darabszám','7','','db')}${numIn('rn_w','Szélesség darabonként','40','')}</div>
   <p class="hint">Az egyforma szekrények egymás mellé kerülnek, a magasság, a mélység és a polcok a sablonból jönnek. Utána mindegyik külön is módosítható, és a sorba más szekrény is tehető (pl. felső szekrények az alsók fölé).</p>
@@ -740,7 +764,7 @@ function rowMake(){const name=($('#rn_name').value||'').trim()||'Sor',[k,i]=($('
  if(!PRE[k]){toast('Válassz sablont');return}if(!ok(w)||w<10){toast('A szélesség legalább 10 cm');return}
  hist();const G={id:uid(),name};S.c.groups=[...(S.c.groups||[]),G];let first=null;
  for(let j=0;j<n;j++){const c=mkCab(k,+i||0,`${name} ${j+1}`);c.W=w;c.g=G.id;fitCab(c);S.c.list.push(c);first=first||c}
- $('#modal').classList.remove('on');S.c.sel=first.id;S.c.cell='';S.c.view='row';ui.setTab('cab');ui.save();ui.render();toast(`${n} szekrény a(z) „${name}” sorban, összesen ${L1(n*w)} cm`)}
+ $('#modal').classList.remove('on');S.c.sel=first.id;S.c.cell='';S.c.view='row';if(!ui.save())return;ui.setTab('cab');ui.render();toast(`${n} szekrény a(z) „${name}” sorban, összesen ${L1(n*w)} cm`)}
 function moveInRow(c,dir){const lane=S.c.list.filter(x=>x.g===c.g&&!!x.fal===!!c.fal),i=lane.indexOf(c),o=lane[i+dir];if(!o)return;hist();
  const a=S.c.list.indexOf(c),b=S.c.list.indexOf(o);S.c.list[a]=o;S.c.list[b]=c;refresh()}
 function act(a,el){const c=cab();
@@ -760,7 +784,7 @@ function act(a,el){const c=cab();
   case 'ctype':hist();c.type=el.dataset.v;refresh();return;
   case 'cleft':moveInRow(c,-1);return;case 'cright':moveInRow(c,1);return;
   case 'gdel':{const G=grp(c.g);if(!G||!confirm(`Feloszlatod a(z) „${G.name}” sort? A szekrények megmaradnak, önállóként.`))return;hist();for(const x of S.c.list)if(x.g===G.id)x.g='';refresh();return}
-  case 'cdup':{hist();const d=JSON.parse(JSON.stringify(c));d.id=uid();d.name=c.name+' (másolat)';d.cols.forEach(col=>{col.id=uid();col.rows.forEach(r=>{r.id=uid();r.items.forEach(it=>it.id=uid())})});S.c.list.splice(S.c.list.indexOf(c)+1,0,d);S.c.sel=d.id;S.c.cell='';refresh();toast('Másolat elkészült');return}
+  case 'cdup':{hist();const d=JSON.parse(JSON.stringify(c));d.id=uid();d.name=c.name+' (másolat)';d.cols.forEach(col=>{col.id=uid();col.rows.forEach(r=>{r.id=uid();r.items.forEach(it=>it.id=uid())})});S.c.list.splice(S.c.list.indexOf(c)+1,0,d);S.c.sel=d.id;S.c.cell='';if(refresh())toast('Másolat elkészült');return}
   case 'cdel':if(!confirm(`Törlöd: „${c.name}”? (Ctrl+Z visszavonja)`))return;hist();S.c.list.splice(S.c.list.indexOf(c),1);S.c.sel=S.c.list[0]?S.c.list[0].id:'';S.c.cell='';refresh();return}
  const fr=S.c.cell?findRow(S.c.cell):null;if(!fr)return;const {col,row}=fr;
  switch(a){
@@ -787,12 +811,12 @@ document.addEventListener('change',e=>{const t=e.target;if(!t.closest)return;
   const L=c.g?grpCabs(c.g):[];if(L.length>1){S.c.list.splice(S.c.list.indexOf(c),1);const last=L.filter(x=>x!==c).pop();S.c.list.splice(S.c.list.indexOf(last)+1,0,c)}later(refresh);return}
  if(t.id==='g_add'){const v=t.value;t.value='';if(v)addCab(v,c.g);return}
  const v=num(t.value);
- if(t.dataset.cf){const k=t.dataset.cf;if(!ok(v)||(!['pl','top','gap','elev'].includes(k)&&v<=0)||v<0){toast('Érvénytelen érték');later(renderPanel);return}hist();c[k]=k==='t'?clamp(v,.3,10):v;fitCab(c);later(refresh);return}
+ if(t.dataset.cf){const k=t.dataset.cf;if(!ok(v)||(!['pl','top','gap','elev'].includes(k)&&v<=0)||v<0){toast('Érvénytelen érték');later(renderPanel);return}hist();c[k]=k==='t'?clamp(v,.3,10):v;const st=fitCab(c);later(()=>{refresh();fitMsg(st,'méretek')});return}
  if(t.dataset.cnc!==undefined){if(!ok(v)){later(renderPanel);return}hist();setCols(c,v);later(refresh);return}
  const fr=S.c.cell?findRow(S.c.cell):null;if(!fr)return;
  if(t.dataset.coln!==undefined){if(!ok(v)||v<0){later(renderPanel);return}hist();setRows(c,fr.col,v+1);later(refresh);return}
- if(t.dataset.colw!==undefined){if(!ok(v)||v<MINR){toast('Érvénytelen szélesség');later(renderPanel);return}hist();fr.col.w=v;fit(c.cols,'w',clearW(c),fr.ci);later(refresh);return}
- if(t.dataset.rowh!==undefined){if(!ok(v)||v<MINR){toast('Érvénytelen magasság');later(renderPanel);return}hist();fr.row.h=v;fit(fr.col.rows,'h',clearH(c,fr.col),fr.ri);later(refresh);return}
+ if(t.dataset.colw!==undefined){if(!ok(v)||v<MINR){toast('Érvénytelen szélesség');later(renderPanel);return}hist();fr.col.w=v;const st=fit(c.cols,'w',clearW(c),fr.ci);later(()=>{refresh();fitMsg(st,'oszlopszélességek')});return}
+ if(t.dataset.rowh!==undefined){if(!ok(v)||v<MINR){toast('Érvénytelen magasság');later(renderPanel);return}hist();fr.row.h=v;const st=fit(fr.col.rows,'h',clearH(c,fr.col),fr.ri);later(()=>{refresh();fitMsg(st,'polcközök')});return}
  if(t.dataset.imv){const to=t.value;if(to)moveItem(t.dataset.imv,to);return}});
 document.addEventListener('keydown',e=>{const tg=e.target,inF=/INPUT|SELECT|TEXTAREA/.test(tg.tagName),mod=e.ctrlKey||e.metaKey,k=e.key.toLowerCase();
  if(tg.id==='pr_new'&&e.key==='Enter'){e.preventDefault();act('iadd',tg);return}
@@ -801,7 +825,10 @@ document.addEventListener('keydown',e=>{const tg=e.target,inF=/INPUT|SELECT|TEXT
  if(!inF&&ui.tab==='cab'&&S.c.cell&&(k==='arrowup'||k==='arrowdown'||k==='arrowleft'||k==='arrowright')){const fr=findRow(S.c.cell);if(!fr||fr.c.id!==(cab()||{}).id)return;e.preventDefault();
   let ci=fr.ci,ri=fr.ri;if(k==='arrowup')ri--;else if(k==='arrowdown')ri++;else if(k==='arrowleft')ci--;else ci++;
   ci=clamp(ci,0,fr.c.cols.length-1);const rows=fr.c.cols[ci].rows;ri=clamp(ri,0,rows.length-1);selectCell(rows[ri].id)}});
-document.addEventListener('focusin',e=>{if(e.target.closest('main')&&/INPUT|SELECT|TEXTAREA/.test(e.target.tagName))hist()});
+/* visszavonási pont a mező első tényleges módosítása előtt (nem fókuszkor, hogy a puszta fókusz ne ürítse az „Újra” vermet) */
+let histArmed=false;
+document.addEventListener('focusin',e=>{if(e.target.closest('main')&&/INPUT|SELECT|TEXTAREA/.test(e.target.tagName))histArmed=true});
+for(const ev of ['input','change'])document.addEventListener(ev,e=>{if(histArmed&&e.target.closest&&e.target.closest('main')){histArmed=false;hist()}},true);
 let rsT=0;addEventListener('resize',()=>{clearTimeout(rsT);rsT=setTimeout(()=>{if(ui.tab==='cab')drawEditor()},150)});
 
 /* ---------- export ---------- */
@@ -827,7 +854,7 @@ function exportCSV(){const rows=[['Sor','Szekrény','Típus','Rekesz','Fajta','B
 
 /* ---------- nézetek ---------- */
 const ck=(k,l)=>`<label class="ck"><input type="checkbox" data-ck="${k}" ${S.p[k]?'checked':''}>${l}</label>`;
-const txt=(k,l,ph='')=>`<div class="f"><label for="i_p_${k}">${l}</label><div class="iw"><input id="i_p_${k}" data-t="p" data-k="${k}" autocomplete="off" value="${esc(S.p[k]??'')}" placeholder="${esc(ph)}"></div></div>`;
+const txt=(k,l,ph='')=>`<div class="f"><label for="i_p_${k}">${l}</label><div class="iw"><input id="i_p_${k}" data-t="p" data-k="${k}" maxlength="${k==='date'?40:120}" autocomplete="off" value="${esc(S.p[k]??'')}" placeholder="${esc(ph)}"></div></div>`;
 let Q='';
 const R={};
 R.cab={title:'Szekrények',desc:'Válassz szekrényt, add meg a méreteit és a polcokat, majd a rekeszekbe írd be, mi kerül oda. Több szekrény egy sorba köthető, így egymás mellett látszanak.',
@@ -849,7 +876,7 @@ R.sheet={title:'Tervlap és export',desc:'Szekrényenként és szekrénysoronké
   <p class="hint">A PNG és az SVG a kiválasztott szekrény lapja, vagy „Teljes sor” nézetben a sor lapja. A PDF-hez a nyomtatási ablakban a „Mentés PDF-ként” célt válaszd.</p></div></div>`},
  calc(){renderTabs();renderView();const el=$('#pr_sheet'),c=cab();if(el)el.innerHTML=c?sheetSVG(curTarget()):'<p class="hint" style="padding:16px">Nincs szekrény.</p>'}};
 const ui=shell({prefix:'pr',tabs:[['cab','Szekrények','Szekrény','cab'],['items','Tárgyak és keresés','Tárgyak','list'],['sheet','Tervlap és export','Tervlap','sheet']],R,
- note:'A méretek centiméterben. A terv a böngészőben tárolódik, JSON-ba menthető.',
+ note:'A méretek centiméterben. A terv a böngészőben tárolódik, JSON-ba menthető. Teljes egészében MI (Claude, Anthropic) készítette. <a href="https://github.com/nomadbeni/butortervezo">Forrás a GitHubon</a>',
  onClick:(a,el)=>act(a,el),
  onInput(t){const c=cab();
   if(t.id==='pr_q'){Q=t.value;R.items.calc();return}
@@ -858,8 +885,14 @@ const ui=shell({prefix:'pr',tabs:[['cab','Szekrények','Szekrény','cab'],['item
   if(t.dataset.gname!==undefined&&c&&grp(c.g)){grp(c.g).name=t.value;ui.save();renderTabs();return}
   if(t.dataset.in){const fi=findItem(t.dataset.in);if(fi){fi.it.n=t.value;ui.save();drawEditor()}return}
   if(t.dataset.iq){const fi=findItem(t.dataset.iq);if(fi){fi.it.q=t.value;ui.save();drawEditor()}return}},
- menu:()=>`<div class="mh">Polcrendező</div><button class="mi" data-m="png">${ic('img')}Tervlap PNG képként</button><button class="mi" data-m="pdf">${ic('doc')}Tervlap PDF-be (A4)</button><button class="mi" data-m="svg">${ic('dl')}Tervlap SVG-be</button><button class="mi" data-m="csv">${ic('dl')}Leltár CSV-be</button><button class="mi" data-m="json">${ic('dl')}Mentés JSON-ba</button><button class="mi" data-m="open">${ic('up')}Megnyitás JSON-ból</button><button class="mi" data-m="rownew">${ic('row')}Szekrénysor létrehozása</button><button class="mi" data-m="demo">${ic('cab')}Minta betöltése</button><button class="mi" data-m="new">${ic('trash')}Új, üres projekt</button>`,
- onMenu(m){act(m,{dataset:{}})}});
+ menu:()=>`<div class="mh">Polcrendező</div><button class="mi" data-m="png">${ic('img')}Tervlap PNG képként</button><button class="mi" data-m="pdf">${ic('doc')}Tervlap PDF-be (A4)</button><button class="mi" data-m="svg">${ic('dl')}Tervlap SVG-be</button><button class="mi" data-m="csv">${ic('dl')}Leltár CSV-be</button><button class="mi" data-m="json">${ic('dl')}Mentés JSON-ba</button><button class="mi" data-m="open">${ic('up')}Megnyitás JSON-ból</button><button class="mi" data-m="rownew">${ic('row')}Szekrénysor létrehozása</button><button class="mi" data-m="demo">${ic('cab')}Minta betöltése</button><button class="mi" data-m="new">${ic('trash')}Új, üres projekt</button>${bakMenu('pr')}`,
+ onMenu(m){if(m==='bak'){downloadBak('pr');return}act(m,{dataset:{}})},
+ guard:()=>prGuard()});
+const prGuard=makeGuard(()=>validatePr({p:S.p,list:S.c.list,groups:S.c.groups}),snap,d=>{S.p=d.p;S.c.list=d.list;S.c.groups=d.groups||[];S.c.sel=d.sel||'';S.c.cell=d.cell||'';RD=lastRD;if(U[U.length-1]===snap())U.pop();ui.render()});
+prGuard();
+/* „Áthelyezés…” lista csak megnyitáskor épül fel (sok rekesznél sem lassú a panel) */
+function fillMove(sel){if(!sel||sel.dataset.filled)return;sel.dataset.filled='1';sel.innerHTML=moveOpts(sel.dataset.cur)}
+for(const ev of ['focusin','pointerdown','mousedown','touchstart'])document.addEventListener(ev,e=>{const t=e.target;if(t&&t.matches&&t.matches('select[data-imv]'))fillMove(t)},{capture:true,passive:true});
 $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')$('#modal').classList.remove('on')});
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.closest&&e.target.closest('#modal')&&e.target.tagName==='INPUT'){e.preventDefault();rowMake()}});
 document.body.insertAdjacentHTML('beforeend','<input type="file" id="pr_file" accept=".json,application/json" hidden>');

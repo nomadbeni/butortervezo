@@ -1,13 +1,11 @@
 /* ===== közös alap (app keret, mezők, téma, menü) ===== */
-const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)];
+const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
+const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v);return true}catch(e){return false}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
 const parse=s=>{try{return JSON.parse(s)}catch(e){return null}};
 const num=v=>{if(v==null)return NaN;if(typeof v==='number')return v;const s=String(v).replace(/\s/g,'').replace(',','.');return s===''?NaN:+s};
 const ok=x=>Number.isFinite(x);
 function fmt(x,d=2){if(!ok(x))return '–';const a=Math.abs(x);let dd=d;if(a>=1000)dd=0;else if(a>=100)dd=Math.min(d,1);return x.toLocaleString('hu-HU',{minimumFractionDigits:0,maximumFractionDigits:dd})}
-const fmtF=(x,d)=>ok(x)?x.toLocaleString('hu-HU',{minimumFractionDigits:d,maximumFractionDigits:d}):'–';
-const fmtFt=x=>ok(x)?Math.round(x).toLocaleString('hu-HU')+' Ft':'–';
 let toastT=0;function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>e.classList.remove('on'),2200)}
 const uid=()=>Math.random().toString(36).slice(2,10);
 const IC={
@@ -17,24 +15,22 @@ const IC={
 };
 const ic=(k,w=18)=>`<svg viewBox="0 0 24 24" width="${w}" height="${w}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${IC[k]||''}</svg>`;
 /* field builders – S[t][k] */
-const unitSel=(t,uk,opts)=>`<select data-t="${t}" data-k="${uk}">${opts.map(u=>`<option ${S[t][uk]===u?'selected':''}>${u}</option>`).join('')}</select>`;
-const fld=(t,k,label,o={})=>{const v=S[t][k]??'';const unit=o.units?unitSel(t,o.uk,o.units):(o.u?`<span class="u">${o.u}</span>`:'');
- return `<div class="f"${o.style?` style="${o.style}"`:''}><label for="i_${t}_${k}">${label}</label><div class="iw"><input id="i_${t}_${k}" data-t="${t}" data-k="${k}" inputmode="decimal" autocomplete="off" value="${esc(v)}" placeholder="${esc(o.ph||'')}">${unit}</div></div>`};
+const fld=(t,k,label,o={})=>{const v=S[t][k]??'';const unit=o.u?`<span class="u">${o.u}</span>`:'';
+ return `<div class="f"${o.style?` style="${o.style}"`:''}><label for="i_${t}_${k}">${label}</label><div class="iw"><input id="i_${t}_${k}" data-t="${t}" data-k="${k}" maxlength="120" inputmode="decimal" autocomplete="off" value="${esc(v)}" placeholder="${esc(o.ph||'')}">${unit}</div></div>`};
 const seg=(t,k,opts)=>`<div class="seg">${opts.map(([v,l])=>`<button type="button" data-t="${t}" data-seg="${k}" data-v="${v}" class="${S[t][k]===v?'on':''}">${l}</button>`).join('')}</div>`;
-const sel=(t,k,opts,label)=>`<div class="f"><label>${label}</label><select class="sel" data-t="${t}" data-k="${k}">${opts.map(o=>{const [v,l]=Array.isArray(o)?o:[o,o];return `<option value="${esc(v)}" ${S[t][k]===v?'selected':''}>${esc(l)}</option>`}).join('')}</select></div>`;
-const kv=(id,label,unit,o={})=>`<div class="kv${o.big?' big':''}"><small>${label}</small><b id="${id}">–</b>${unit?`<i>${unit}</i>`:''}${o.alt?`<span class="alt" id="${id}_alt"></span>`:''}</div>`;
-const set=(id,v,alt)=>{const e=document.getElementById(id);if(e)e.textContent=v;if(alt!==undefined){const a=document.getElementById(id+'_alt');if(a)a.textContent=alt}};
 async function download(name,text,type){const blob=new Blob([text],{type});const file=new File([blob],name,{type});
  if(navigator.canShare&&/Mobi|Android|iPhone|iPad/.test(navigator.userAgent)&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file],title:name});return}catch(e){if(e.name==='AbortError')return}}
  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)}
 const safeName=s=>(s||'export').replace(/[^\p{L}\p{N}\-_ ]/gu,'').trim().replace(/\s+/g,'_')||'export';
-const csvQ=v=>{v=String(v??'');return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
-async function copyText(t){try{await navigator.clipboard.writeText(t);return true}catch(e){const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();let r=false;try{r=document.execCommand('copy')}catch(_){}ta.remove();return r}}
+/* CSV-cella: a képletként értelmezhető kezdőkaraktert (= + - @ TAB CR) aposztróf semlegesíti (CSV-injektálás ellen) */
+const csvQ=v=>{v=String(v??'');if(/^[=+\-@\t\r]/.test(v))v="'"+v;return /[;"\r\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
 /* app shell */
 function shell(cfg){
  // cfg: {prefix, tabs:[[key,label,short,icon]], R, onClick(act,el), onInput(el), menu(), onMenu(m), afterRender()}
- let tab=store.get(cfg.prefix+'.tab');if(!cfg.R[tab])tab=cfg.tabs[0][0];
- let saveT=0;const save=()=>{clearTimeout(saveT);saveT=setTimeout(()=>store.set(cfg.prefix+'.state',JSON.stringify(S)),250)};
+ let tab=store.get(cfg.prefix+'.tab');if(!cfg.tabs.some(t=>t[0]===tab))tab=cfg.tabs[0][0];
+ /* mentés: ha az app ad guard()-ot, csak érvényes állapot kerül a tárolóba (a guard vissza is állíthat) */
+ let saveT=0;const save=()=>{if(cfg.guard&&!cfg.guard())return false;clearTimeout(saveT);
+  saveT=setTimeout(()=>{if(!store.set(cfg.prefix+'.state',JSON.stringify(S)))toast('Nem sikerült menteni a böngészőbe (megtelt a tárhely?). Mentsd a tervet JSON-ba.')},250);return true};
  const navHTML=c=>cfg.tabs.map(([k,l,sh,icn],i)=>`${c==='side'&&cfg.sep&&cfg.sep.includes(i)?'<hr>':''}<button data-tab="${k}" class="${tab===k?'on':''}">${ic(icn||k)}<span>${c==='side'?l:sh}</span></button>`).join('')+(c==='side'?`<hr><div class="ver">${cfg.note||'Számítások tájékoztató jellegűek, a tervezői felelősséget nem váltják ki.'}</div>`:'');
  function render(){const r=cfg.R[tab];$('#side').innerHTML=navHTML('side');$('#bot').innerHTML=navHTML('bot');
   $('#main').innerHTML=`<div class="ph"><div><h1>${r.title}</h1><p>${r.desc}</p></div></div>${r.html()}`;r.calc();cfg.afterRender&&cfg.afterRender();
@@ -61,7 +57,8 @@ const IMP_MAX_BYTES=2*1024*1024;
 class ImportErr extends Error{constructor(m){super(m);this.name='ImportErr'}}
 const impFail=m=>{throw new ImportErr(m)};
 const isObj=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
-const vStr=(v,max=200,def='')=>(typeof v==='string'?v:(typeof v==='number'&&Number.isFinite(v)?String(v):def)).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g,'').slice(0,max);
+/* egysoros szöveg: sortörés és TAB szóközre, egyéb vezérlőkarakter törölve, hossz korlátozva */
+const vStr=(v,max=200,def='')=>(typeof v==='string'?v:(typeof v==='number'&&Number.isFinite(v)?String(v):def)).replace(/[\t\r\n]+/g,' ').replace(/[\u0000-\u001f\u007f]/g,'').slice(0,max);
 const vNumRaw=v=>typeof v==='number'?v:(typeof v==='string'&&v.trim()!==''&&v.length<40?num(v):NaN);
 const vNum=(v,lo,hi,what)=>{const n=vNumRaw(v);if(!Number.isFinite(n)||n<lo||n>hi)impFail(`Érvénytelen érték: ${what} (${lo} és ${hi} közötti szám kell)`);return n};
 const vNumOpt=(v,lo,hi,def)=>{const n=vNumRaw(v);return Number.isFinite(n)?Math.min(hi,Math.max(lo,n)):def};
@@ -69,7 +66,7 @@ const vArr=(v,max,what,min=0)=>{if(!Array.isArray(v))impFail(`Hiányzó vagy hib
 const vObj=(v,what)=>{if(!isObj(v))impFail(`Hibás adat: ${what}`);return v};
 const vOne=(v,list,def)=>list.includes(v)?v:def;
 const vFlag=v=>v===true||v===1||v==='1'?'1':'';
-const SAFE_ID=/^[a-z0-9]{1,16}$/;
+const vBool=v=>v===true||v===1||v==='1'?1:0;
 function parseImport(text,app,appName){if(typeof text!=='string')impFail('A fájl nem szöveges.');
  if(text.length>IMP_MAX_BYTES)impFail('A fájl túl nagy (legfeljebb 2 MB lehet).');
  let d;try{d=JSON.parse(text)}catch(e){impFail('A fájl nem érvényes JSON.')}
@@ -81,3 +78,18 @@ function readImport(file,app,appName,validate){return new Promise((res,rej)=>{
  const rd=new FileReader();rd.onerror=()=>rej(new ImportErr('A fájl nem olvasható.'));
  rd.onload=()=>{try{res(validate(parseImport(rd.result,app,appName)))}catch(e){rej(e instanceof ImportErr?e:new ImportErr('Hibás tervfájl.'))}};
  rd.readAsText(file)})}
+/* ===== tárolt terv védelme =====
+   Betöltéskor hibás tárolt terv: az eredeti szöveg a <prefix>.state.bak kulcsra kerül, és a menüből letölthető (nem vész el csendben).
+   Szerkesztéskor: az app guard()-ja minden mentés előtt ugyanazzal az ellenőrzéssel nézi az állapotot, mint az import;
+   ha nem felel meg (pl. túl nagy méret, túl sok elem), a módosítást visszavonja, így a tárolt terv mindig betölthető marad. */
+const bakKey=p=>p+'.state.bak';
+function keepBadState(prefix){const raw=store.get(prefix+'.state');if(raw)store.set(bakKey(prefix),raw)}
+const bakMenu=prefix=>store.get(bakKey(prefix))?`<button class="mi" data-m="bak">${ic('dl')}Hibás tárolt terv letöltése</button>`:'';
+function downloadBak(prefix){const raw=store.get(bakKey(prefix));if(!raw)return;download(prefix+'_hibas_tarolt_terv.json',raw,'application/json');store.del(bakKey(prefix));toast('Letöltve; a böngészőből törölve.')}
+/* check(): érvényes-e az állapot; snapshot(): az állapot szövegként; apply(d): visszaállítás egy korábbi pillanatképre.
+   Visszaállítás mindig az utolsó, ellenőrzésen átment állapotra történik (nem a visszavonási verem tetejére). */
+function makeGuard(check,snapshot,apply){let busy=false,last=null;
+ return ()=>{if(busy)return true;try{check();last=snapshot();return true}catch(e){
+  busy=true;const msg=e instanceof ImportErr?e.message:'Érvénytelen állapot.';
+  try{if(last){apply(JSON.parse(last));toast(msg+' A módosítás visszavonva.')}else toast(msg+' A terv nem menthető: mentsd JSON-ba.')}
+  catch(_){toast('A terv nem menthető: mentsd JSON-ba.')}finally{busy=false}return false}}}

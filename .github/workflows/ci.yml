@@ -1,4 +1,4 @@
-name: CI
+name: Ellenőrzés és közzététel (GitHub Pages)
 
 on:
   push:
@@ -9,52 +9,93 @@ on:
 permissions:
   contents: read
 
+# A lépések commit-azonosítóra rögzítve (a megjegyzés a verzió); frissítést havonta a Dependabot javasol.
+
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}   # a main-en nem szakít meg közzétételt
 
 jobs:
-  check:
+  test:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0          # a commit-előzmény ellenőrzéséhez
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.12'
 
       - name: Python build szkriptek ellenőrzése
         run: python -m py_compile src/*.py
 
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22.12.0'
+
       - name: Build és egyezés a commitolt HTML-ekkel
         run: |
           npm run build
-          git diff --exit-code -- '*.html' || (echo "::error::A kész HTML-ek nem egyeznek a forrással – futtasd: npm run build, és commitold az eredményt." && exit 1)
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22.12.0'
-          cache: npm
+          if [ -n "$(git status --porcelain -- '*.html')" ]; then
+            git status --porcelain -- '*.html'
+            echo "::error::A kész HTML-ek nem egyeznek a forrással (vagy nincsenek commitolva) – futtasd: npm run build, és commitold az eredményt."
+            exit 1
+          fi
 
       - name: Függőségek (rögzített verziók a package-lock.json alapján)
         run: npm ci
 
-      - name: JavaScript szintaxis és kezdőlap-linkek
+      - name: Szabályellenőrzés, JS szintaxis, commit-előzmény
         run: npm run check
 
+      - name: Playwright böngésző gyorsítótára
+        id: pw-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ hashFiles('package-lock.json') }}-${{ runner.os }}
+
       - name: Chromium telepítése a Playwrighthoz
-        run: npx playwright install --with-deps chromium
+        run: |
+          if [ "${{ steps.pw-cache.outputs.cache-hit }}" = "true" ]; then npx playwright install-deps chromium
+          else npx playwright install --with-deps chromium; fi
 
       - name: Böngészős és logikai tesztek
         run: npx playwright test
 
       - name: Tesztjelentés feltöltése hiba esetén
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-report
           path: |
             playwright-report/
             test-results/
           retention-days: 7
+
+  deploy:
+    needs: test
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Közzétett fájlok (csak a kész oldalak és a licenc)
+        run: mkdir _site && cp index.html kanape.html polcrendezo.html LICENSE _site/
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

@@ -70,11 +70,11 @@ function validateKp(d){
  const items=vArr(db.items,KP_LIM.items,'elemek').map((b,i)=>{const n=`${i+1}. elem`;vObj(b,n);const id=uid();if(typeof b.id==='string')idMap[b.id]=id;
   return {id,name:vStr(b.name,80)||'Elem',type:vOne(b.type,Object.keys(TY),'seat'),
    x:vNum(b.x,-KP_LIM.coord,KP_LIM.coord,n+' x'),y:vNum(b.y,-KP_LIM.coord,KP_LIM.coord,n+' y'),
-   w:vNum(b.w,.1,KP_LIM.size,n+' szélesség'),h:vNum(b.h,.1,KP_LIM.size,n+' mélység'),dw:b.dw?1:0,dh:b.dh?1:0,
+   w:vNum(b.w,.1,KP_LIM.size,n+' szélesség'),h:vNum(b.h,.1,KP_LIM.size,n+' mélység'),dw:vBool(b.dw),dh:vBool(b.dh),
    tab:(Array.isArray(b.tab)?b.tab:[]).slice(0,KP_LIM.tab).filter(isObj).map(r=>({f:vOne(r.f,['w','h','wh'],'w'),l:vStr(r.l,120)}))}});
  return {p,b:{items,sel:''},idMap}}
 S=loadState('kp',DEF);
-{let v=null;if(Array.isArray(S.b.items)){try{v=validateKp({p:S.p,b:S.b})}catch(e){v=null;setTimeout(()=>toast('A tárolt terv hibás volt, a minta töltődött be.'),400)}}
+{let v=null;if(Array.isArray(S.b.items)){try{v=validateKp({p:S.p,b:S.b})}catch(e){v=null;keepBadState('kp');setTimeout(()=>toast('A tárolt terv hibás volt, a minta töltődött be. Az eredeti a menüből letölthető.'),400)}}
  if(v){const sel=v.idMap[S.b.sel]||'';S.p=v.p;S.b=v.b;S.b.sel=sel}else{S.p=validateKp({p:S.p,b:{items:[]}}).p;S.b={items:TPL.kep.items(),sel:''}}}
 
 /* ---------- segédek ---------- */
@@ -98,7 +98,8 @@ const pv=k=>{const v=num(S.p[k]);return ok(v)?v:NaN};
 /* ---------- visszavonás ---------- */
 let U=[],RD=[];
 const snap=()=>JSON.stringify({p:S.p,b:S.b});
-function hist(){const j=snap();if(U[U.length-1]!==j){U.push(j);if(U.length>80)U.shift();RD=[]}}
+let lastRD=[];
+function hist(){const j=snap();if(U[U.length-1]!==j){U.push(j);if(U.length>80)U.shift();lastRD=RD;RD=[]}}
 function applySnap(j){const d=JSON.parse(j);S.p=d.p;S.b=d.b;ui.save();ui.render()}
 function undo(){const cur=snap();while(U.length&&U[U.length-1]===cur)U.pop();if(!U.length){toast('Nincs több visszavonható lépés');return}RD.push(cur);applySnap(U.pop())}
 function redo(){if(!RD.length){toast('Nincs ismételhető lépés');return}U.push(snap());applySnap(RD.pop())}
@@ -261,8 +262,9 @@ function sheetSVG(){const p=S.p,it=S.b.items,M=16;
  o+=tx(px+14,y+32,'Méretek (cm)',22,800)+line(px,y+46,px+PW,y+46,1.6);
  const allRows=[...rows,['Magasság:',ok(H)?L1(H):'–',1]];
  allRows.forEach(([l,v,b],i)=>{const yy=y+46+rh*i;if(b)o+=line(px,yy,px+PW,yy,1.6);else if(i)o+=line(px+8,yy,px+PW-8,yy,.8,'#b8bec6');
-  const vw=tw(v,rfs),lfs=Math.min(rfs,(PW-34-vw-12)/(String(l).length*.55));
-  o+=tx(px+12,yy+rh/2+rfs*.36,l,lfs,b?800:500)+tx(px+PW-12,yy+rh/2+rfs*.36,v,rfs,b?800:600,'end')});
+  const vMax=Math.max(4,Math.floor((PW*.55)/(rfs*.58))),vs=String(v).length>vMax?String(v).slice(0,vMax-1)+'…':String(v);
+  const vw=tw(vs,rfs),lfs=Math.max(7,Math.min(rfs,(PW-34-vw-12)/(Math.max(1,String(l).length)*.55))),lMax=Math.max(4,Math.floor((PW-34-vw-12)/(lfs*.55))),ls=String(l).length>lMax?String(l).slice(0,lMax-1)+'…':String(l);
+  o+=tx(px+12,yy+rh/2+rfs*.36,ls,lfs,b?800:500)+tx(px+PW-12,yy+rh/2+rfs*.36,vs,rfs,b?800:600,'end')});
  y+=tabH+gap;
  o+=`<rect x="${px}" y="${f(y)}" width="${PW}" height="${sideH}" fill="#fff" stroke="${INK}" stroke-width="1.6"/>`+tx(px+14,y+30,'Oldalnézet',20,800);
  o+=sideView(px+12,y+42,PW-24,sideH-52,17);
@@ -289,8 +291,9 @@ function drawEditor(fit){const cv=$('#kp_cv');if(!cv)return;const it=S.b.items;c
  const T=mkT(EV.s,EV.ox,EV.oy,bb),k=EV.vw/Math.min(EV.vw,cv.clientWidth||EV.vw);
  let o=`<rect width="${f(EV.vw)}" height="${f(EV.vh)}" fill="#fcfcfa"/>`;
  const cx0=Math.floor(-EV.ox/EV.s/10)*10,cx1=(EV.vw-EV.ox)/EV.s,cy0=Math.floor(-EV.oy/EV.s/10)*10,cy1=(EV.vh-EV.oy)/EV.s;
- for(let x=cx0;x<=cx1;x+=10)o+=line(T.X(x),0,T.X(x),EV.vh,x%50?.6*k:1*k,x%50?'#eef0f2':'#dde1e6');
- for(let y=cy0;y<=cy1;y+=10)o+=line(0,T.Y(y),EV.vw,T.Y(y),y%50?.6*k:1*k,y%50?'#eef0f2':'#dde1e6');
+ const gs=10*Math.max(1,Math.ceil(Math.max(cx1-cx0,cy1-cy0)/10/300)),g5=gs*5;   // legfeljebb ~300 rácsvonal irányonként
+ for(let x=Math.floor(cx0/gs)*gs;x<=cx1;x+=gs)o+=line(T.X(x),0,T.X(x),EV.vh,x%g5?.6*k:1*k,x%g5?'#eef0f2':'#dde1e6');
+ for(let y=Math.floor(cy0/gs)*gs;y<=cy1;y+=gs)o+=line(0,T.Y(y),EV.vw,T.Y(y),y%g5?.6*k:1*k,y%g5?'#eef0f2':'#dde1e6');
  o+=planSVG(it,T,STE,{labels:1,sizes:1,lfs:12});
  for(const b of it)o+=`<rect data-id="${b.id}" x="${f(T.X(b.x))}" y="${f(T.Y(b.y))}" width="${f(b.w*T.s)}" height="${f(b.h*T.s)}" fill="transparent" style="cursor:move"/>`;
  const b=selB();
@@ -330,11 +333,11 @@ let rzT=0;window.addEventListener('resize',()=>{clearTimeout(rzT);rzT=setTimeout
 const fin=v=>String(v).replace('.',',');
 const pf=(b,k,l)=>`<div class="f"><label>${l}</label><div class="iw"><input data-bk="${k}" inputmode="decimal" autocomplete="off" value="${fin(b[k])}"><span class="u">cm</span></div></div>`;
 function renderPanel(){const pp=$('#kp_props');if(pp){const b=selB();
- pp.innerHTML=b?`<div class="f"><label>Megnevezés</label><div class="iw"><input data-bk="name" autocomplete="off" value="${esc(b.name)}"></div></div>
+ pp.innerHTML=b?`<div class="f"><label>Megnevezés</label><div class="iw"><input data-bk="name" maxlength="80" autocomplete="off" value="${esc(b.name)}"></div></div>
   <div class="f"><span class="l">Típus</span><div class="seg">${Object.entries(TY).map(([k,[n]])=>`<button type="button" data-act="type" data-v="${k}" class="${b.type===k?'on':''}">${n}</button>`).join('')}</div></div>
   <div class="fields f2">${pf(b,'x','X (balról)')}${pf(b,'y','Y (felülről)')}${pf(b,'w','Szélesség ↔')}${pf(b,'h','Hossz ↕')}</div>
   <div class="cks"><label class="ck"><input type="checkbox" data-bck="dw" ${b.dw?'checked':''}>Szélesség-méret a rajzon</label><label class="ck"><input type="checkbox" data-bck="dh" ${b.dh?'checked':''}>Hossz-méret a rajzon</label></div>
-  <div class="f"><span class="l">Sorok a méret-táblázatban</span><div class="tlist">${(b.tab||[]).map((r,i)=>`<div class="trw"><select class="sel" data-tf="${i}">${[['w','szélesség'],['h','hossz'],['wh','sz × h']].map(([v,l])=>`<option value="${v}" ${r.f===v?'selected':''}>${l}</option>`).join('')}</select><input class="txt" data-tl="${i}" value="${esc(r.l)}" placeholder="${esc(b.name)}" autocomplete="off"><button class="btn sm" data-act="tdel" data-i="${i}" title="Sor törlése" aria-label="Sor törlése">${ic('trash',14)}</button></div>`).join('')}</div>
+  <div class="f"><span class="l">Sorok a méret-táblázatban</span><div class="tlist">${(b.tab||[]).map((r,i)=>`<div class="trw"><select class="sel" data-tf="${i}">${[['w','szélesség'],['h','hossz'],['wh','sz × h']].map(([v,l])=>`<option value="${v}" ${r.f===v?'selected':''}>${l}</option>`).join('')}</select><input class="txt" data-tl="${i}" maxlength="120" value="${esc(r.l)}" placeholder="${esc(b.name)}" autocomplete="off"><button class="btn sm" data-act="tdel" data-i="${i}" title="Sor törlése" aria-label="Sor törlése">${ic('trash',14)}</button></div>`).join('')}</div>
   <div><button class="btn sm" data-act="tadd">${ic('plus')}Sor</button></div></div>
   <div class="row"><button class="btn sm" data-act="dup">${ic('copy')}Másolat</button><button class="btn sm" data-act="rot">${ic('rot')}90°</button><button class="btn sm" data-act="front" title="Előre hoz">${ic('front')}Előre</button><button class="btn sm" data-act="back" title="Hátra küld">${ic('back')}Hátra</button><button class="btn sm danger" data-act="del">${ic('trash')}Törlés</button></div>`
  :`<p class="hint">Kattints egy elemre a rajzon vagy a listában. Húzással mozgatod, a sarkoknál és oldalaknál átméretezed; a többi elem éléhez és a rácshoz illeszkedik.</p><p class="hint"><b>Billentyűk:</b> nyilak = mozgatás (Shift: 1 cm), Delete = törlés, Ctrl+D = másolat, Ctrl+Z / Ctrl+Y = vissza / újra.</p>`}
@@ -367,7 +370,10 @@ function exportJSON(){download(fileBase()+'.json',JSON.stringify({app:'kanape',v
 function applyImport(v,name){hist();S.p=v.p;S.b=v.b;ui.save();ui.render();toast('Betöltve: '+name)}
 document.addEventListener('change',e=>{if(e.target.id!=='kp_file')return;const fl=e.target.files[0];e.target.value='';if(!fl)return;
  readImport(fl,'kanape','Kanapé-tervező',validateKp).then(v=>applyImport(v,fl.name),err=>toast('Nem sikerült betölteni: '+err.message))});
-document.addEventListener('focusin',e=>{if(e.target.closest('main')&&/INPUT|SELECT|TEXTAREA/.test(e.target.tagName))hist()});
+/* visszavonási pont a mező első tényleges módosítása előtt (nem fókuszkor, hogy a puszta fókusz ne ürítse az „Újra” vermet) */
+let histArmed=false;
+document.addEventListener('focusin',e=>{if(e.target.closest('main')&&/INPUT|SELECT|TEXTAREA/.test(e.target.tagName))histArmed=true});
+for(const ev of ['input','change'])document.addEventListener(ev,e=>{if(histArmed&&e.target.closest&&e.target.closest('main')){histArmed=false;hist()}},true);
 document.addEventListener('click',e=>{if(e.target.closest('[data-seg][data-t]'))hist()},true);
 document.addEventListener('keydown',e=>{const tg=e.target,inF=/INPUT|SELECT|TEXTAREA/.test(tg.tagName),mod=e.ctrlKey||e.metaKey,k=e.key.toLowerCase();
  if(mod&&!inF&&k==='z'){e.preventDefault();e.shiftKey?redo():undo();return}
@@ -386,13 +392,13 @@ function act(a,el){const b=selB(),it=S.b.items;
   case 'mirH':mirror('h');return;case 'mirV':mirror('v');return;case 'norm':normalize();return;
   case 'png':exportPNG();return;case 'svg':exportSVG();return;case 'pdf':exportPDF();return;case 'json':exportJSON();return;
   case 'open':$('#kp_file').click();return;
-  case 'xadd':hist();S.p.extra.push({l:'',v:''});ui.save();ui.render();return;
+  case 'xadd':if(S.p.extra.length>=KP_LIM.extra){toast(`Legfeljebb ${KP_LIM.extra} saját sor lehet.`);return}hist();S.p.extra.push({l:'',v:''});ui.save();ui.render();return;
   case 'xdel':hist();S.p.extra.splice(+el.dataset.i,1);ui.save();ui.render();return;
   case 'new':if(it.length&&!confirm('Új, üres tervet kezdesz? (Ctrl+Z visszavonja)'))return;hist();S.b.items=[];S.b.sel='';ui.save();ui.render();return}
  if(!b)return;
  switch(a){
   case 'type':hist();b.type=el.dataset.v;break;
-  case 'tadd':hist();(b.tab=b.tab||[]).push({f:'w',l:''});break;
+  case 'tadd':if((b.tab||[]).length>=KP_LIM.tab){toast(`Legfeljebb ${KP_LIM.tab} sor lehet elemenként.`);return}hist();(b.tab=b.tab||[]).push({f:'w',l:''});break;
   case 'tdel':hist();b.tab.splice(+el.dataset.i,1);break;
   case 'dup':{hist();const c=JSON.parse(JSON.stringify(b));c.id=uid();c.name=b.name+' (másolat)';c.x=r1(b.x+(num(S.p.snap)||5)*2);c.y=r1(b.y+(num(S.p.snap)||5)*2);it.push(c);S.b.sel=c.id;break}
   case 'rot':hist();[b.w,b.h]=[b.h,b.w];[b.dw,b.dh]=[b.dh,b.dw];break;
@@ -404,7 +410,7 @@ function act(a,el){const b=selB(),it=S.b.items;
 
 /* ---------- nézetek ---------- */
 const ck=(k,l)=>`<label class="ck"><input type="checkbox" data-ck="${k}" ${S.p[k]?'checked':''}>${l}</label>`;
-const txt=(k,l,ph='')=>`<div class="f"><label for="i_p_${k}">${l}</label><div class="iw"><input id="i_p_${k}" data-t="p" data-k="${k}" autocomplete="off" value="${esc(S.p[k]??'')}" placeholder="${esc(ph)}"></div></div>`;
+const txt=(k,l,ph='')=>`<div class="f"><label for="i_p_${k}">${l}</label><div class="iw"><input id="i_p_${k}" data-t="p" data-k="${k}" maxlength="${k==='date'?40:120}" autocomplete="off" value="${esc(S.p[k]??'')}" placeholder="${esc(ph)}"></div></div>`;
 const R={};
 R.plan={title:'Felülnézet',desc:'A kanapé téglalap elemekből áll: ülőrész, bőr perem / könyöklő, háttámla, párna. A méretláncokat az app az elemekből számolja, a tervlapon ugyanez a rajz jelenik meg.',
  html(){return `<div class="kpg"><div class="card"><h2><span>Rajz</span><span id="kp_pill" class="pill na"></span></h2>
@@ -432,23 +438,26 @@ R.sheet={title:'Tervlap és export',desc:'A méretezett tervrajz A4 fekvő lapon
   <div class="card"><h2>Méret-táblázat</h2><div class="cks">${ck('totW','Teljes szélesség')}${ck('totH','Teljes hossz')}${ck('trimSum','Bőr perem összhossza (m)')}${ck('area','Ülő- és párnafelület (m²)')}</div>
    <div class="fields">${txt('lTotW','Teljes szélesség felirata')}${txt('lTotH','Teljes hossz felirata')}</div>
    <p class="hint">Az elemek sorait a Felülnézet fülön, a kijelölt elemnél adod meg. Az utolsó sor mindig a magasság.</p>
-   <div class="f"><span class="l">Saját sorok</span><div class="tlist">${S.p.extra.map((x,i)=>`<div class="trw x"><input class="txt" data-xr="${i}" data-xf="l" value="${esc(x.l)}" placeholder="Felirat" autocomplete="off"><input class="txt" data-xr="${i}" data-xf="v" value="${esc(x.v)}" placeholder="Érték" autocomplete="off"><button class="btn sm" data-act="xdel" data-i="${i}" aria-label="Sor törlése">${ic('trash',14)}</button></div>`).join('')}</div><div><button class="btn sm" data-act="xadd">${ic('plus')}Sor</button></div></div></div>
+   <div class="f"><span class="l">Saját sorok</span><div class="tlist">${S.p.extra.map((x,i)=>`<div class="trw x"><input class="txt" data-xr="${i}" data-xf="l" maxlength="120" value="${esc(x.l)}" placeholder="Felirat" autocomplete="off"><input class="txt" data-xr="${i}" data-xf="v" maxlength="120" value="${esc(x.v)}" placeholder="Érték" autocomplete="off"><button class="btn sm" data-act="xdel" data-i="${i}" aria-label="Sor törlése">${ic('trash',14)}</button></div>`).join('')}</div><div><button class="btn sm" data-act="xadd">${ic('plus')}Sor</button></div></div></div>
   <div class="card"><h2>Jelmagyarázat</h2><div class="fields">${txt('lgSeat','Ülőrész')}${txt('lgTrim','Bőr perem / könyöklő')}${txt('lgBack','Háttámla')}${txt('lgPil','Párna / fekvőrész')}</div><p class="hint">Csak a rajzon szereplő típusok jelennek meg. A bőr peremnél a leggyakoribb szélesség automatikusan mögé kerül.</p></div></div>`},
  calc(){const el=$('#kp_sheet');if(el)el.innerHTML=sheetSVG()}};
 const ui=shell({prefix:'kp',tabs:[['plan','Felülnézet','Felül','plan'],['side','Oldalnézet','Oldal','side'],['sheet','Tervlap és export','Tervlap','sheet']],R,
- note:'A méretek centiméterben. A terv a böngészőben tárolódik, JSON-ba menthető.',
+ note:'A méretek centiméterben. A terv a böngészőben tárolódik, JSON-ba menthető. Teljes egészében MI (Claude, Anthropic) készítette. <a href="https://github.com/nomadbeni/butortervezo">Forrás a GitHubon</a>',
  onClick:(a,el)=>act(a,el),
  onInput(t){const b=selB();
   if(t.id==='kp_tpl'){const v=t.value;t.value='';if(v)loadTpl(v);return}
   if(t.dataset.ck){S.p[t.dataset.ck]=t.checked?'1':'';ui.recalc();return}
   if(t.dataset.xr!=null){const x=S.p.extra[+t.dataset.xr];if(x){x[t.dataset.xf]=t.value;ui.recalc()}return}
   if(!b)return;
-  if(t.dataset.bk){const k=t.dataset.bk;if(k==='name')b.name=t.value;else{const v=num(t.value);if(!ok(v))return;b[k]=k==='w'||k==='h'?Math.max(1,v):v}drawEditor(true);stats();renderList();ui.save();return}
+  if(t.dataset.bk){const k=t.dataset.bk;if(k==='name')b.name=t.value.slice(0,80);else{const v=num(t.value);if(!ok(v))return;const sz=k==='w'||k==='h',lo=sz?.1:-KP_LIM.coord,hi=sz?KP_LIM.size:KP_LIM.coord;b[k]=clamp(sz?Math.max(1,v):v,lo,hi);if(b[k]!==v&&!(sz&&v<1))toast(`A megengedett tartomány: ${lo} … ${hi} cm`)}drawEditor(true);stats();renderList();ui.save();return}
   if(t.dataset.bck){b[t.dataset.bck]=t.checked?1:0;drawEditor(true);ui.save();return}
   if(t.dataset.tf!=null){b.tab[+t.dataset.tf].f=t.value;ui.save();return}
   if(t.dataset.tl!=null){b.tab[+t.dataset.tl].l=t.value;ui.save();return}},
- menu:()=>`<div class="mh">Kanapé-tervező</div><button class="mi" data-m="png">${ic('img')}Tervlap PNG képként</button><button class="mi" data-m="pdf">${ic('doc')}Tervlap PDF-be (A4)</button><button class="mi" data-m="svg">${ic('dl')}Tervlap SVG-be</button><button class="mi" data-m="json">${ic('dl')}Mentés JSON-ba</button><button class="mi" data-m="open">${ic('up')}Megnyitás JSON-ból</button><button class="mi" data-m="new">${ic('trash')}Új, üres terv</button>`,
- onMenu(m){act(m,{dataset:{}})}});
+ menu:()=>`<div class="mh">Kanapé-tervező</div><button class="mi" data-m="png">${ic('img')}Tervlap PNG képként</button><button class="mi" data-m="pdf">${ic('doc')}Tervlap PDF-be (A4)</button><button class="mi" data-m="svg">${ic('dl')}Tervlap SVG-be</button><button class="mi" data-m="json">${ic('dl')}Mentés JSON-ba</button><button class="mi" data-m="open">${ic('up')}Megnyitás JSON-ból</button><button class="mi" data-m="new">${ic('trash')}Új, üres terv</button>${bakMenu('kp')}`,
+ onMenu(m){if(m==='bak'){downloadBak('kp');return}act(m,{dataset:{}})},
+ guard:()=>kpGuard()});
+const kpGuard=makeGuard(()=>validateKp({p:S.p,b:S.b}),snap,d=>{S.p=d.p;S.b=d.b;RD=lastRD;if(U[U.length-1]===snap())U.pop();ui.render()});
+kpGuard();
 document.body.insertAdjacentHTML('beforeend','<input type="file" id="kp_file" accept=".json,application/json" hidden>');
 ui.render();
 /* tesztelési felület (tests/*.spec.mjs) */

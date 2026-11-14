@@ -2,6 +2,7 @@
 import os
 SP=os.path.dirname(os.path.abspath(__file__))+'/'
 CSS=open(SP+'common.css').read()
+CSP=open(SP+'csp.txt').read().strip()
 APPS=[
  dict(href='kanape.html',name='Kanapé-tervező',grad='linear-gradient(135deg,#b45309,#f59e0b)',
   icon='<path d="M5 11V8a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v3"/><path d="M3 12a2 2 0 0 1 4 0v2h10v-2a2 2 0 0 1 4 0v5H3z"/><path d="M5 17v2M19 17v2"/>',
@@ -27,7 +28,8 @@ a.app p{margin:0;color:var(--muted);font-size:14px}
 a.app .tags{display:flex;gap:6px;flex-wrap:wrap}
 a.app .tags span{font-size:11.5px;font-weight:700;color:var(--muted);background:var(--in);border:1px solid var(--line);border-radius:999px;padding:2px 9px}
 a.app .go{margin-top:auto;font-weight:700;color:var(--accent);font-size:14px}
-.foot{color:var(--muted);font-size:12.5px;border-top:1px solid var(--line);padding-top:14px}
+.foot{color:var(--muted);font-size:12.5px;border-top:1px solid var(--line);padding-top:14px;display:flex;flex-direction:column;gap:6px}
+.foot p{margin:0}.foot a{color:var(--accent);font-weight:600}
 '''
 cards=''.join(f'''<a class="app" href="{a['href']}"><div class="top"><div class="ico" style="background:{a['grad']}"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">{a['icon']}</svg></div><h2>{a['name']}</h2></div><p>{a['desc']}</p><div class="tags">{''.join(f'<span>{t}</span>' for t in a['tags'])}</div><div class="go">Megnyitás →</div></a>''' for a in APPS)
 logo='<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V9l8-5 8 5v12"/><path d="M8 21v-6h8v6M8 12h8"/></svg>'
@@ -36,6 +38,7 @@ html=f'''<!doctype html>
 <html lang="hu">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="{CSP}">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#334155">
 <title>Bútortervező</title>
@@ -57,7 +60,12 @@ html=f'''<!doctype html>
 <div class="wrap">
  <div class="hero"><h1>Bútortervező</h1><p>Egyfájlos tervező appok telefonra és laptopra. A tervek a böngészőben maradnak, JSON-ba menthetők, a tervlap képként és PDF-ként exportálható.</p></div>
  <div class="apps">{cards}</div>
- <div class="foot">Minden app offline is működik, nincs regisztráció és nincs szerver: a terv csak a saját böngésződben tárolódik.</div>
+ <footer class="foot">
+  <p>Nincs regisztráció, nincs szerver, nincs adatgyűjtés: a terv csak a saját böngésződben tárolódik (localStorage), és JSON-ba menthető. A betűtípust a Google Fonts szolgáltatja.</p>
+  <p><a href="https://github.com/nomadbeni/butortervezo">Forráskód a GitHubon</a> · Szabad felhasználás az <a href="https://github.com/nomadbeni/butortervezo/blob/main/LICENSE">MIT licenc</a> szerint.</p>
+  <p>A tárolóban minden kódot és leírást teljes egészében mesterséges intelligencia (Claude, Anthropic) készített, az ellenőrzést egy másik MI végezte.</p>
+  <p lang="en">All code and text in this repository were created entirely by AI (Claude, Anthropic) and reviewed by another AI. Free to use under the MIT License.</p>
+ </footer>
 </div>
 <div id="toast"></div>
 <script>
@@ -70,5 +78,7 @@ document.getElementById('themeBtn').onclick=()=>{{const n=TH[(TH.indexOf(get())+
 </body>
 </html>
 '''
+from build import with_script_hash
+html=with_script_hash(html)
 open(os.path.join(SP,'..','index.html'),'w',encoding='utf-8').write(html)
 print('wrote index.html',len(html))

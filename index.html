@@ -2,6 +2,7 @@
 <html lang="hu">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-7+1GNPWYDO+PCNy7vApI5x08LV6INhTzw5MK6dghByw='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; worker-src 'none'; frame-src 'none'">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#334155">
 <title>Bútortervező</title>
@@ -183,7 +184,8 @@ a.app p{margin:0;color:var(--muted);font-size:14px}
 a.app .tags{display:flex;gap:6px;flex-wrap:wrap}
 a.app .tags span{font-size:11.5px;font-weight:700;color:var(--muted);background:var(--in);border:1px solid var(--line);border-radius:999px;padding:2px 9px}
 a.app .go{margin-top:auto;font-weight:700;color:var(--accent);font-size:14px}
-.foot{color:var(--muted);font-size:12.5px;border-top:1px solid var(--line);padding-top:14px}
+.foot{color:var(--muted);font-size:12.5px;border-top:1px solid var(--line);padding-top:14px;display:flex;flex-direction:column;gap:6px}
+.foot p{margin:0}.foot a{color:var(--accent);font-weight:600}
 
 </style>
 </head>
@@ -197,7 +199,12 @@ a.app .go{margin-top:auto;font-weight:700;color:var(--accent);font-size:14px}
 <div class="wrap">
  <div class="hero"><h1>Bútortervező</h1><p>Egyfájlos tervező appok telefonra és laptopra. A tervek a böngészőben maradnak, JSON-ba menthetők, a tervlap képként és PDF-ként exportálható.</p></div>
  <div class="apps"><a class="app" href="kanape.html"><div class="top"><div class="ico" style="background:linear-gradient(135deg,#b45309,#f59e0b)"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 11V8a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v3"/><path d="M3 12a2 2 0 0 1 4 0v2h10v-2a2 2 0 0 1 4 0v5H3z"/><path d="M5 17v2M19 17v2"/></svg></div><h2>Kanapé-tervező</h2></div><p>Sarok-, egyenes és U alakú kanapé felülnézetben, téglalap elemekből. Automatikus méretláncok, oldalnézet, méret-táblázat.</p><div class="tags"><span>Felülnézet</span><span>Méretláncok</span><span>PNG · SVG · PDF</span></div><div class="go">Megnyitás →</div></a><a class="app" href="polcrendezo.html"><div class="top"><div class="ico" style="background:linear-gradient(135deg,#0f766e,#14b8a6)"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M4 9h16M4 15h16"/><path d="M7 6.5h3M13 12.5h4M7 18.5h5"/></svg></div><h2>Polcrendező</h2></div><p>Fali, álló, konyha- és fürdőszoba szekrények: méretek, polcok, polcközök arányos átméretezéssel, és hogy melyik polcra mi kerül.</p><div class="tags"><span>Szekrények</span><span>Kereső</span><span>PNG · SVG · PDF · CSV</span></div><div class="go">Megnyitás →</div></a></div>
- <div class="foot">Minden app offline is működik, nincs regisztráció és nincs szerver: a terv csak a saját böngésződben tárolódik.</div>
+ <footer class="foot">
+  <p>Nincs regisztráció, nincs szerver, nincs adatgyűjtés: a terv csak a saját böngésződben tárolódik (localStorage), és JSON-ba menthető. A betűtípust a Google Fonts szolgáltatja.</p>
+  <p><a href="https://github.com/nomadbeni/butortervezo">Forráskód a GitHubon</a> · Szabad felhasználás az <a href="https://github.com/nomadbeni/butortervezo/blob/main/LICENSE">MIT licenc</a> szerint.</p>
+  <p>A tárolóban minden kódot és leírást teljes egészében mesterséges intelligencia (Claude, Anthropic) készített, az ellenőrzést egy másik MI végezte.</p>
+  <p lang="en">All code and text in this repository were created entirely by AI (Claude, Anthropic) and reviewed by another AI. Free to use under the MIT License.</p>
+ </footer>
 </div>
 <div id="toast"></div>
 <script>
